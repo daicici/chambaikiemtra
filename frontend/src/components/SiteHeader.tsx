@@ -1,14 +1,23 @@
 import { BookOpenCheck, LogIn, Menu, UserPlus, X } from "lucide-react";
 import { useState } from "react";
-import type { AccountState, AuthMode } from "../types";
+import type { AccountState, AuthMode, FeatureKey } from "../types";
 
 type SiteHeaderProps = {
   accountState: AccountState;
   accountEmail: string;
+  activeFeature: FeatureKey;
+  onSelectFeature: (feature: FeatureKey) => void;
   onOpenAuth: (mode: AuthMode) => void;
 };
 
-export function SiteHeader({ accountState, accountEmail, onOpenAuth }: SiteHeaderProps) {
+const navItems: Array<{ key: FeatureKey; label: string }> = [
+  { key: "exam", label: "Tạo mã đề" },
+  { key: "answerSheet", label: "Phiếu trả lời" },
+  { key: "autoGrader", label: "Chấm bài tự động" },
+  { key: "classroom", label: "Tạo lớp" }
+];
+
+export function SiteHeader({ accountState, accountEmail, activeFeature, onSelectFeature, onOpenAuth }: SiteHeaderProps) {
   const isSignedIn = accountState === "active" || accountState === "trial";
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -19,6 +28,11 @@ export function SiteHeader({ accountState, accountEmail, onOpenAuth }: SiteHeade
 
   function closeSidebar() {
     setIsSidebarOpen(false);
+  }
+
+  function selectFeature(feature: FeatureKey) {
+    setIsSidebarOpen(false);
+    onSelectFeature(feature);
   }
 
   function renderAuthControls() {
@@ -52,9 +66,16 @@ export function SiteHeader({ accountState, accountEmail, onOpenAuth }: SiteHeade
         </a>
 
         <nav className="site-nav" aria-label="Điều hướng chính">
-          <a href="#tao-ma-de">Tạo mã đề</a>
-          <a href="#cham-bai">Chấm bài tự động</a>
-          <a href="#phieu-tra-loi">Phiếu trả lời</a>
+          {navItems.map((item) => (
+            <button
+              className={activeFeature === item.key ? "is-active" : ""}
+              type="button"
+              key={item.key}
+              onClick={() => selectFeature(item.key)}
+            >
+              {item.label}
+            </button>
+          ))}
         </nav>
 
         <div className="header-actions">{renderAuthControls()}</div>
@@ -89,15 +110,16 @@ export function SiteHeader({ accountState, accountEmail, onOpenAuth }: SiteHeade
           </div>
 
           <nav className="mobile-sidebar-nav">
-            <a href="#tao-ma-de" onClick={closeSidebar}>
-              Tạo mã đề
-            </a>
-            <a href="#cham-bai" onClick={closeSidebar}>
-              Chấm bài tự động
-            </a>
-            <a href="#phieu-tra-loi" onClick={closeSidebar}>
-              Phiếu trả lời
-            </a>
+            {navItems.map((item) => (
+              <button
+                className={activeFeature === item.key ? "is-active" : ""}
+                type="button"
+                key={item.key}
+                onClick={() => selectFeature(item.key)}
+              >
+                {item.label}
+              </button>
+            ))}
           </nav>
 
           <div className="mobile-sidebar-actions">{renderAuthControls()}</div>

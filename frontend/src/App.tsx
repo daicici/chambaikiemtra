@@ -2,11 +2,13 @@ import { ChangeEvent, useState } from "react";
 import { AnswerSheetDownload } from "./components/AnswerSheetDownload";
 import { AuthModal } from "./components/AuthModal";
 import { AutoGrader } from "./components/AutoGrader";
+import { ClassManager } from "./components/ClassManager";
 import { ExamGenerator } from "./components/ExamGenerator";
+import { FeatureTabs } from "./components/FeatureTabs";
 import { HeroSection } from "./components/HeroSection";
 import { SiteHeader } from "./components/SiteHeader";
 import { UploadPanel } from "./components/UploadPanel";
-import type { AccountState, AuthMode, WorkState } from "./types";
+import type { AccountState, AuthMode, FeatureKey, WorkState } from "./types";
 import { downloadBlob, slug } from "./utils/file";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "";
@@ -26,6 +28,12 @@ export function App() {
   const [message, setMessage] = useState("");
   const [sheetState, setSheetState] = useState<WorkState>("idle");
   const [sheetMessage, setSheetMessage] = useState("");
+  const [activeFeature, setActiveFeature] = useState<FeatureKey>("exam");
+
+  function selectFeature(feature: FeatureKey) {
+    setActiveFeature(feature);
+    window.setTimeout(() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" }), 0);
+  }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const nextFile = event.target.files?.[0] ?? null;
@@ -110,39 +118,57 @@ export function App() {
   return (
     <div className="site-shell">
       <div className="education-backdrop" aria-hidden="true" />
-      <SiteHeader accountState={accountState} accountEmail={accountEmail} onOpenAuth={setAuthMode} />
+      <SiteHeader
+        accountState={accountState}
+        accountEmail={accountEmail}
+        activeFeature={activeFeature}
+        onSelectFeature={selectFeature}
+        onOpenAuth={setAuthMode}
+      />
 
       <main>
         <HeroSection
           onSignup={() => setAuthMode("signup")}
-          onJumpToTool={() => document.getElementById("tao-ma-de")?.scrollIntoView({ behavior: "smooth" })}
+          onJumpToTool={() => selectFeature("exam")}
         />
 
-        <div className="tool-layout" aria-label="Công cụ tạo mã đề và phiếu trả lời">
-          <UploadPanel file={file} onFileChange={handleFileChange} />
-          <ExamGenerator
-            accountState={accountState}
-            file={file}
-            title={title}
-            baseCode={baseCode}
-            variantCount={variantCount}
-            shuffleQuestions={shuffleQuestions}
-            shuffleAnswers={shuffleAnswers}
-            includeAnswerKey={includeAnswerKey}
-            generateState={generateState}
-            message={message}
-            onTitleChange={setTitle}
-            onBaseCodeChange={setBaseCode}
-            onVariantCountChange={setVariantCount}
-            onShuffleQuestionsChange={setShuffleQuestions}
-            onShuffleAnswersChange={setShuffleAnswers}
-            onIncludeAnswerKeyChange={setIncludeAnswerKey}
-            onGenerate={handleGenerate}
-            onResetState={() => setGenerateState("idle")}
-            onRequireAuth={() => setAuthMode("login")}
-          />
-          <AnswerSheetDownload sheetState={sheetState} sheetMessage={sheetMessage} onDownload={handleDownloadAnswerSheet} />
-          <AutoGrader accountState={accountState} onRequireAuth={() => setAuthMode("login")} />
+        <div className="tool-layout" id="features" aria-label="Khu chức năng">
+          <FeatureTabs activeFeature={activeFeature} onSelectFeature={selectFeature} />
+
+          {activeFeature === "exam" && (
+            <div className="feature-panel" aria-label="Chức năng tạo mã đề">
+              <UploadPanel file={file} onFileChange={handleFileChange} />
+              <ExamGenerator
+                accountState={accountState}
+                file={file}
+                title={title}
+                baseCode={baseCode}
+                variantCount={variantCount}
+                shuffleQuestions={shuffleQuestions}
+                shuffleAnswers={shuffleAnswers}
+                includeAnswerKey={includeAnswerKey}
+                generateState={generateState}
+                message={message}
+                onTitleChange={setTitle}
+                onBaseCodeChange={setBaseCode}
+                onVariantCountChange={setVariantCount}
+                onShuffleQuestionsChange={setShuffleQuestions}
+                onShuffleAnswersChange={setShuffleAnswers}
+                onIncludeAnswerKeyChange={setIncludeAnswerKey}
+                onGenerate={handleGenerate}
+                onResetState={() => setGenerateState("idle")}
+                onRequireAuth={() => setAuthMode("login")}
+              />
+            </div>
+          )}
+
+          {activeFeature === "answerSheet" && (
+            <AnswerSheetDownload sheetState={sheetState} sheetMessage={sheetMessage} onDownload={handleDownloadAnswerSheet} />
+          )}
+
+          {activeFeature === "autoGrader" && <AutoGrader accountState={accountState} onRequireAuth={() => setAuthMode("login")} />}
+
+          {activeFeature === "classroom" && <ClassManager />}
         </div>
       </main>
 

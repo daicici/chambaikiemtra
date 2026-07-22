@@ -1,4 +1,4 @@
-import { Camera, FileCheck2, FileSpreadsheet, Lock, Play, Upload } from "lucide-react";
+import { Camera, FileCheck2, FileSpreadsheet, Lock, Play, Square, Upload } from "lucide-react";
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { AccountState } from "../types";
 import { downloadBlob } from "../utils/file";
@@ -36,12 +36,30 @@ type StudentMetadata = {
 
 const QUESTION_COUNT = 40;
 const CHOICES: Exclude<AnswerValue, null>[] = ["A", "B", "C", "D"];
+const STABLE_FRAME_DIFF = 5.5;
+const CHANGE_FRAME_DIFF = 16;
+const STABLE_CAPTURE_MS = 1400;
+const SCAN_INTERVAL_MS = 360;
+
+type ScanState = {
+  signature: number[] | null;
+  stableSince: number;
+  waitingForChange: boolean;
+  inFlight: boolean;
+};
 
 export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
   const isSignedIn = accountState === "active" || accountState === "trial";
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const ocrWorkerRef = useRef<OcrWorker | null>(null);
+  const scanIntervalRef = useRef<number | null>(null);
+  const scanStateRef = useRef<ScanState>({
+    signature: null,
+    stableSince: 0,
+    waitingForChange: false,
+    inFlight: false
+  });
   const [answerFile, setAnswerFile] = useState<File | null>(null);
   const [answerKey, setAnswerKey] = useState<AnswerValue[]>([]);
   const [sessionStarted, setSessionStarted] = useState(false);
@@ -56,7 +74,6 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
 
   const detectedAnswerCount = useMemo(() => answerKey.filter(Boolean).length, [answerKey]);
   const canStart = Boolean(answerFile) && detectedAnswerCount > 0;
-  const canCapture = sessionStarted && canStart && !isGrading;
 
   useEffect(() => {
     if (!isSignedIn) {
@@ -103,10 +120,24 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
 
   useEffect(() => {
     return () => {
+      stopAutoScan();
       ocrWorkerRef.current?.terminate();
       ocrWorkerRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!sessionStarted || !canStart || !isSignedIn) {
+      stopAutoScan();
+      return;
+    }
+
+    startAutoScan();
+
+    return () => {
+      stopAutoScan();
+    };
+  }, [sessionStarted, canStart, isSignedIn, answerKey, detectedAnswerCount]);
 
   function stopCurrentCamera() {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -123,6 +154,7 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
     setSessionStarted(false);
     setLastMetadata(null);
     setLastScoreResult(null);
+    stopAutoScan();
     setGraderMessage("");
 
     if (!nextFile) return;
@@ -148,30 +180,95 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
 
   function handleStart() {
     if (!canStart) return;
+    setLastScoreResult(null);
     setSessionStarted(true);
-    setGraderMessage("Đã bắt đầu chấm bài. Đặt phiếu thẳng trong khung camera rồi chụp từng học sinh.");
+    setGraderMessage("Đã bắt đầu chấm tự động. Đặt tập bài trước camera và giữ bài đầu tiên ổn định trong khung.");
   }
 
-  async function handleCaptureAndGrade() {
+  function handleStop() {
+    setSessionStarted(false);
+    stopAutoScan();
+    setIsGrading(false);
+    setGraderMessage("Đã dừng chấm tự động. Bạn có thể tải file Excel hoặc bấm Bắt đầu để chấm tiếp.");
+  }
+
+  function startAutoScan() {
+    stopAutoScan();
+    scanStateRef.current = {
+      signature: null,
+      stableSince: 0,
+      waitingForChange: false,
+      inFlight: false
+    };
+
+    scanIntervalRef.current = window.setInterval(() => {
+      void observeFrameForAutoScan();
+    }, SCAN_INTERVAL_MS);
+  }
+
+  function stopAutoScan() {
+    if (scanIntervalRef.current !== null) {
+      window.clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
+    scanStateRef.current.inFlight = false;
+  }
+
+  async function observeFrameForAutoScan() {
     const video = videoRef.current;
-    if (!video || video.readyState < 2) {
-      setGraderMessage("Camera chưa có hình ảnh để chụp.");
+    const scanState = scanStateRef.current;
+    if (!video || video.readyState < 2 || scanState.inFlight || isGrading) return;
+
+    const signature = getVideoFrameSignature(video);
+    if (!signature) return;
+
+    const now = Date.now();
+    const diff = scanState.signature ? getSignatureDiff(scanState.signature, signature) : Number.POSITIVE_INFINITY;
+    scanState.signature = signature;
+
+    if (scanState.waitingForChange) {
+      if (diff > CHANGE_FRAME_DIFF) {
+        scanState.waitingForChange = false;
+        scanState.stableSince = 0;
+        setGraderMessage("Đã phát hiện giáo viên đổi bài. Đang chờ bài kế tiếp ổn định để chấm tự động...");
+      }
       return;
     }
 
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
-    const context = canvas.getContext("2d");
-    if (!context) return;
+    if (diff <= STABLE_FRAME_DIFF && hasLikelyPaper(signature)) {
+      if (!scanState.stableSince) {
+        scanState.stableSince = now;
+        setGraderMessage("Đã thấy bài trong khung. Giữ yên một chút để hệ thống tự chấm...");
+        return;
+      }
 
+      if (now - scanState.stableSince >= STABLE_CAPTURE_MS) {
+        scanState.inFlight = true;
+        const canvas = captureVideoCanvas(video);
+        if (!canvas) {
+          scanState.inFlight = false;
+          return;
+        }
+
+        const success = await gradeCapturedCanvas(canvas);
+        scanState.waitingForChange = success;
+        scanState.stableSince = 0;
+        scanState.signature = null;
+        scanState.inFlight = false;
+      }
+      return;
+    }
+
+    scanState.stableSince = 0;
+  }
+
+  async function gradeCapturedCanvas(canvas: HTMLCanvasElement) {
     setIsGrading(true);
     setOcrProgress(0);
     setLastScoreResult(null);
-    setGraderMessage("Đang chụp phiếu, nhận diện họ tên/lớp/mã đề và đối chiếu đáp án...");
+    setGraderMessage("Đang tự động chụp, nhận diện họ tên/lớp/mã đề và đối chiếu đáp án...");
 
     try {
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
       const metadata = await extractStudentMetadata(canvas, getOcrWorker, setOcrProgress);
       const studentAnswers = extractMultipleChoiceAnswers(canvas);
       const total = detectedAnswerCount;
@@ -193,10 +290,14 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
       setLastMetadata(metadata);
       setLastScoreResult(nextResult);
       setResults((current) => [...current, nextResult]);
-      setGraderMessage(`Đã chấm xong ${correct}/${total} câu và nhận diện thông tin học sinh. Tiếp tục phiếu kế tiếp.`);
+      setGraderMessage(
+        `Đã chấm xong ${correct}/${total} câu. Hãy nhấc bài vừa chấm ra khỏi tập, hệ thống sẽ tự chấm bài kế tiếp.`
+      );
+      return true;
     } catch (error) {
       setLastScoreResult(null);
       setGraderMessage(error instanceof Error ? error.message : "Không thể nhận diện thông tin trên phiếu.");
+      return false;
     } finally {
       setIsGrading(false);
     }
@@ -288,20 +389,30 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
             </span>
           </div>
 
-          <button className="primary-button full-width" type="button" disabled={!canStart || isReadingKey} onClick={handleStart}>
+          <button
+            className="primary-button full-width"
+            type="button"
+            disabled={sessionStarted || !canStart || isReadingKey}
+            onClick={handleStart}
+          >
             <Play size={19} />
-            <span>Bắt đầu</span>
+            <span>{sessionStarted ? "Đang chấm tự động" : "Bắt đầu"}</span>
           </button>
 
           <div className="ocr-hint">
             <FileCheck2 size={18} />
-            <span>Thông tin Họ tên, Lớp và Mã đề sẽ được nhận diện tự động từ vùng đầu phiếu khi chụp.</span>
+            <span>
+              Sau khi bấm Bắt đầu, hệ thống tự chụp khi bài ổn định. Chấm xong một bài, hãy nhấc bài đó ra khỏi tập để
+              chuyển sang bài kế tiếp.
+            </span>
           </div>
 
-          <button className="primary-button full-width free-button" type="button" disabled={!canCapture} onClick={handleCaptureAndGrade}>
-            <Camera size={19} />
-            <span>{isGrading ? `Đang nhận diện ${ocrProgress}%` : "Chụp, nhận diện và chấm bài"}</span>
-          </button>
+          {sessionStarted && (
+            <button className="ghost-button full-width" type="button" onClick={handleStop}>
+              <Square size={17} />
+              <span>Dừng chấm tự động</span>
+            </button>
+          )}
 
           <button className="ghost-button full-width" type="button" disabled={results.length === 0} onClick={handleDownloadExcel}>
             <FileSpreadsheet size={19} />
@@ -426,6 +537,61 @@ async function pdfToCanvas(file: File) {
   if (!context) throw new Error("Không tạo được vùng đọc PDF.");
   await page.render({ canvasContext: context, viewport }).promise;
   return canvas;
+}
+
+function captureVideoCanvas(video: HTMLVideoElement) {
+  if (video.readyState < 2) return null;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth || 1280;
+  canvas.height = video.videoHeight || 720;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+function getVideoFrameSignature(video: HTMLVideoElement) {
+  if (video.readyState < 2) return null;
+
+  const size = 24;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) return null;
+
+  context.drawImage(video, 0, 0, size, size);
+  const imageData = context.getImageData(0, 0, size, size);
+  const signature: number[] = [];
+
+  for (let index = 0; index < imageData.data.length; index += 4) {
+    const red = imageData.data[index];
+    const green = imageData.data[index + 1];
+    const blue = imageData.data[index + 2];
+    signature.push(red * 0.3 + green * 0.59 + blue * 0.11);
+  }
+
+  return signature;
+}
+
+function getSignatureDiff(previous: number[], next: number[]) {
+  if (previous.length !== next.length) return Number.POSITIVE_INFINITY;
+  const total = previous.reduce((sum, value, index) => sum + Math.abs(value - next[index]), 0);
+  return total / previous.length;
+}
+
+function hasLikelyPaper(signature: number[]) {
+  const average = signature.reduce((sum, value) => sum + value, 0) / signature.length;
+  const variance =
+    signature.reduce((sum, value) => {
+      const delta = value - average;
+      return sum + delta * delta;
+    }, 0) / signature.length;
+  const contrast = Math.sqrt(variance);
+
+  return average > 62 && contrast > 8;
 }
 
 function extractMultipleChoiceAnswers(source: HTMLCanvasElement): AnswerValue[] {

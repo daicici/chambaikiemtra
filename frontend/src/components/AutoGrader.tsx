@@ -344,10 +344,13 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
 
     try {
       const metadata = await extractStudentMetadata(canvas, getOcrWorker, setOcrProgress);
+      const studentAnswers = extractMultipleChoiceAnswers(canvas);
       const total = detectedAnswerCount;
-      // Tạm dừng đối chiếu đáp án tự động: quét thành công thì lưu học sinh với điểm mặc định 0.
-      const correct = 0;
-      const score = 0;
+      const correct = answerKey.reduce((sum, keyAnswer, index) => {
+        if (!keyAnswer) return sum;
+        return sum + (studentAnswers[index] === keyAnswer ? 1 : 0);
+      }, 0);
+      const score = total > 0 ? Number(((correct / total) * 10).toFixed(2)) : 0;
       const nextResult = {
         id: Date.now(),
         name: metadata.name,
@@ -363,7 +366,7 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
       setFullscreenScoreResult(nextResult);
       setResults((current) => [...current, nextResult]);
       setGraderMessage(
-        "Đã nhận diện thông tin học sinh và lưu kết quả mặc định 0 điểm. Hãy nhấc bài vừa quét ra khỏi tập để chuyển sang bài kế tiếp."
+        `Đã chấm xong ${correct}/${total} câu. Hãy nhấc bài vừa chấm ra khỏi tập, hệ thống sẽ tự chấm bài kế tiếp.`
       );
       return true;
     } catch (error) {
@@ -523,7 +526,10 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
             <div className="grading-score-overlay" aria-live="polite">
               <span>Điểm</span>
               <strong>{formatScore(fullscreenScoreResult.score)}</strong>
-              <p>{formatStudentSummary(fullscreenScoreResult)}</p>
+              <p>
+                Đúng {fullscreenScoreResult.correct}/{fullscreenScoreResult.total} câu
+                {fullscreenScoreResult.name !== "Chưa nhận diện" ? ` - ${fullscreenScoreResult.name}` : ""}
+              </p>
             </div>
           )}
         </div>
@@ -550,7 +556,8 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
             <strong>{formatScore(lastScoreResult.score)}</strong>
           </div>
           <p>
-            {formatStudentSummary(lastScoreResult)} - Kết quả mặc định 0 điểm
+            Đúng {lastScoreResult.correct}/{lastScoreResult.total} câu
+            {lastScoreResult.name !== "Chưa nhận diện" ? ` - ${lastScoreResult.name}` : ""}
           </p>
         </div>
       )}
@@ -904,16 +911,6 @@ function foldVietnamese(value: string) {
 
 function formatScore(score: number) {
   return Number.isInteger(score) ? String(score) : score.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
-}
-
-function formatStudentSummary(result: StudentResult) {
-  return [
-    result.name,
-    result.className !== "Chưa nhận diện" ? `Lớp ${result.className}` : "",
-    result.examCode !== "Chưa nhận diện" ? `Mã đề ${result.examCode}` : ""
-  ]
-    .filter(Boolean)
-    .join(" - ");
 }
 
 function buildExcelHtml(results: StudentResult[]) {

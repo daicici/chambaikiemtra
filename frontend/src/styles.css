@@ -755,6 +755,63 @@ textarea:focus {
   text-align: center;
 }
 
+.template-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.template-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 11px;
+  align-items: start;
+  border: 1px solid #dce3de;
+  border-radius: 8px;
+  background: #fbfdfb;
+  padding: 13px;
+  color: #30453b;
+  text-align: left;
+}
+
+.template-option:hover,
+.template-option.is-selected {
+  border-color: #bd476f;
+  background: #fff3f7;
+}
+
+.template-radio {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #cfd8d2;
+  border-radius: 50%;
+  margin-top: 1px;
+  background: #ffffff;
+}
+
+.template-option.is-selected .template-radio {
+  border: 5px solid #bd476f;
+}
+
+.template-option strong,
+.template-option small {
+  display: block;
+}
+
+.template-option strong {
+  color: #20382f;
+  font-size: 14px;
+}
+
+.template-option small {
+  margin-top: 4px;
+  color: #66756d;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
 .bubble-blocks {
   display: grid;
   grid-template-columns: repeat(4, minmax(132px, 1fr));
@@ -1496,6 +1553,15 @@ textarea:focus {
 
   .sheet-preview {
     display: none;
+  }
+
+  .template-picker {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .template-option {
+    padding: 11px;
   }
 
   .answer-key-upload {

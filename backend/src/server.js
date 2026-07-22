@@ -34,7 +34,12 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.get("/api/answer-sheet-template", (_req, res) => {
-  const filename = "mau-phieu-trac-nghiem-2025-rut-gon.pdf";
+  const templateType = String(_req.query.type || "full");
+  const templates = {
+    full: "mau-phieu-trac-nghiem-2025-rut-gon.pdf",
+    forty: "mau-phieu-trac-nghiem-40-cau.pdf"
+  };
+  const filename = templates[templateType] || templates.full;
   const candidates = [
     path.resolve(process.cwd(), "output/pdf", filename),
     path.resolve(process.cwd(), "../output/pdf", filename)

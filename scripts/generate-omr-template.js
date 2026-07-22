@@ -5,6 +5,7 @@ import PdfPrinter from "pdfmake";
 
 const require = createRequire(import.meta.url);
 const outputPath = path.resolve("output/pdf/mau-phieu-trac-nghiem-2025-rut-gon.pdf");
+const singlePartOutputPath = path.resolve("output/pdf/mau-phieu-trac-nghiem-40-cau.pdf");
 const pink = "#d56b92";
 const lightPink = "#fff1f6";
 const dark = "#2a171b";
@@ -102,14 +103,98 @@ const docDefinition = {
 
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 
-const pdf = printer.createPdfKitDocument(docDefinition);
-const output = fs.createWriteStream(outputPath);
-pdf.pipe(output);
-pdf.end();
+await writePdf(docDefinition, outputPath);
+await writePdf(createSinglePartDocDefinition(), singlePartOutputPath);
 
-output.on("finish", () => {
-  console.log(outputPath);
-});
+function writePdf(documentDefinition, targetPath) {
+  return new Promise((resolve, reject) => {
+    const pdf = printer.createPdfKitDocument(documentDefinition);
+    const output = fs.createWriteStream(targetPath);
+    pdf.pipe(output);
+    pdf.end();
+    output.on("finish", () => {
+      console.log(targetPath);
+      resolve();
+    });
+    output.on("error", reject);
+    pdf.on("error", reject);
+  });
+}
+
+function createSinglePartDocDefinition() {
+  return {
+    pageSize: "A4",
+    pageMargins: [28, 24, 28, 24],
+    defaultStyle: {
+      font: "Arial",
+      fontSize: 9,
+      color: dark,
+      lineHeight: 1.1
+    },
+    content: [
+      {
+        table: {
+          widths: ["*"],
+          body: [
+            [
+              {
+                stack: [
+                  {
+                    text: "PHIẾU  TRẢ  LỜI  TRẮC  NGHIỆM",
+                    alignment: "center",
+                    bold: true,
+                    fontSize: 16,
+                    margin: [0, 4, 0, 9]
+                  },
+                  {
+                    columns: [
+                      infoBlock("Họ và tên", "............................................................"),
+                      infoBlock("Môn thi", "........................................"),
+                      infoBlock("Lớp", "...................."),
+                      infoBlock("Mã đề", "........")
+                    ],
+                    columnGap: 9,
+                    margin: [0, 0, 0, 10]
+                  },
+                  sectionLabel("PHẦN I"),
+                  {
+                    columns: [
+                      answerBlock(1, 10),
+                      answerBlock(11, 20),
+                      answerBlock(21, 30),
+                      answerBlock(31, 40)
+                    ],
+                    columnGap: 12,
+                    margin: [0, 2, 0, 0]
+                  },
+                  {
+                    text: "Lưu ý: Phiếu này chỉ dùng cho đề gồm 40 câu trắc nghiệm A, B, C, D.",
+                    margin: [0, 12, 0, 0],
+                    fontSize: 8,
+                    italics: true,
+                    color: "#5b454b"
+                  }
+                ],
+                fillColor: lightPink,
+                margin: [10, 9, 10, 10]
+              }
+            ]
+          ]
+        },
+        layout: {
+          hLineColor: () => pink,
+          vLineColor: () => pink,
+          hLineWidth: () => 1,
+          vLineWidth: () => 1,
+          paddingLeft: () => 0,
+          paddingRight: () => 0,
+          paddingTop: () => 0,
+          paddingBottom: () => 0
+        }
+      }
+    ]
+  };
+}
 
 function infoBlock(label, placeholder) {
   return {

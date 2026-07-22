@@ -8,7 +8,7 @@ import { FeatureTabs } from "./components/FeatureTabs";
 import { HeroSection } from "./components/HeroSection";
 import { SiteHeader } from "./components/SiteHeader";
 import { UploadPanel } from "./components/UploadPanel";
-import type { AccountState, AuthMode, FeatureKey, WorkState } from "./types";
+import type { AccountState, AnswerSheetTemplateKey, AuthMode, FeatureKey, WorkState } from "./types";
 import { downloadBlob, slug } from "./utils/file";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "";
@@ -94,19 +94,21 @@ export function App() {
     }
   }
 
-  async function handleDownloadAnswerSheet() {
+  async function handleDownloadAnswerSheet(template: AnswerSheetTemplateKey) {
     setSheetState("working");
     setSheetMessage("Đang chuẩn bị file phiếu trả lời trắc nghiệm...");
 
     try {
-      const response = await fetch(`${API_URL}/api/answer-sheet-template`);
+      const response = await fetch(`${API_URL}/api/answer-sheet-template?type=${template}`);
       if (!response.ok) {
         const error = await response.json().catch(() => null);
         throw new Error(error?.message ?? "Không thể tải phiếu trả lời.");
       }
 
       const blob = await response.blob();
-      downloadBlob(blob, "mau-phieu-trac-nghiem-2025-rut-gon.pdf");
+      const filename =
+        template === "forty" ? "mau-phieu-trac-nghiem-40-cau.pdf" : "mau-phieu-trac-nghiem-2025-rut-gon.pdf";
+      downloadBlob(blob, filename);
       setSheetState("done");
       setSheetMessage("Đã tải PDF phiếu trả lời miễn phí.");
     } catch (error) {

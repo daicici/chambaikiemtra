@@ -1247,6 +1247,10 @@ input:focus {
     min-width: 0;
   }
 
+  .sheet-preview {
+    display: none;
+  }
+
   .answer-key-upload {
     min-height: 116px;
     padding: 10px;
@@ -1348,10 +1352,6 @@ input:focus {
   .mobile-sidebar {
     width: min(282px, calc(100vw - 28px));
     padding: 12px;
-  }
-
-  .bubble-blocks {
-    grid-template-columns: 1fr;
   }
 
   .result-table {

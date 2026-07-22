@@ -1,5 +1,5 @@
-import { Camera, FileCheck2, FileSpreadsheet, Lock, Play, Upload, X } from "lucide-react";
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { Camera, FileCheck2, FileSpreadsheet, Lock, Play, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { AccountState } from "../types";
 import { downloadBlob } from "../utils/file";
 import { Notice } from "./Notice";
@@ -63,13 +63,13 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
     waitingForChange: false,
     inFlight: false
   });
-  const [answerFile, setAnswerFile] = useState<File | null>(null);
-  const [answerKey, setAnswerKey] = useState<AnswerValue[]>([]);
+  const [answerKey, setAnswerKey] = useState<AnswerValue[]>(createEmptyAnswerKey());
+  const [draftAnswerKey, setDraftAnswerKey] = useState<AnswerValue[]>(createEmptyAnswerKey());
+  const [isAnswerKeyEditorOpen, setIsAnswerKeyEditorOpen] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
   const [results, setResults] = useState<StudentResult[]>([]);
   const [cameraMessage, setCameraMessage] = useState("");
   const [graderMessage, setGraderMessage] = useState("");
-  const [isReadingKey, setIsReadingKey] = useState(false);
   const [isGrading, setIsGrading] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   const [lastMetadata, setLastMetadata] = useState<StudentMetadata | null>(null);
@@ -79,7 +79,8 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
   const [isCaptureFlash, setIsCaptureFlash] = useState(false);
 
   const detectedAnswerCount = useMemo(() => answerKey.filter(Boolean).length, [answerKey]);
-  const canStart = Boolean(answerFile) && detectedAnswerCount > 0;
+  const draftAnswerCount = useMemo(() => draftAnswerKey.filter(Boolean).length, [draftAnswerKey]);
+  const canStart = detectedAnswerCount === QUESTION_COUNT;
 
   useEffect(() => {
     if (!isSignedIn) {
@@ -110,7 +111,7 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
-        setCameraMessage("Camera đã sẵn sàng. Tải đáp án đúng rồi bấm Bắt đầu để chấm toàn màn hình.");
+        setCameraMessage("Camera đã sẵn sàng. Tạo đáp án đúng rồi bấm Bắt đầu để chấm toàn màn hình.");
       } catch {
         setCameraMessage("Không mở được camera. Vui lòng cấp quyền camera cho trình duyệt.");
       }
@@ -171,10 +172,23 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
     }
   }
 
-  async function handleAnswerFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const nextFile = event.target.files?.[0] ?? null;
-    setAnswerFile(nextFile);
-    setAnswerKey([]);
+  function openAnswerKeyEditor() {
+    setDraftAnswerKey(answerKey.map((answer) => answer));
+    setIsAnswerKeyEditorOpen(true);
+  }
+
+  function handleDraftAnswerChange(questionIndex: number, answer: Exclude<AnswerValue, null>) {
+    setDraftAnswerKey((current) => current.map((currentAnswer, index) => (index === questionIndex ? answer : currentAnswer)));
+  }
+
+  function handleSaveAnswerKey() {
+    const count = draftAnswerKey.filter(Boolean).length;
+    if (count < QUESTION_COUNT) {
+      setGraderMessage(`Vui lòng chọn đủ ${QUESTION_COUNT} đáp án trước khi lưu. Hiện đã chọn ${count}/${QUESTION_COUNT}.`);
+      return;
+    }
+
+    setAnswerKey(draftAnswerKey.map((answer) => answer));
     setSessionStarted(false);
     setLastMetadata(null);
     setLastScoreResult(null);
@@ -182,27 +196,8 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
     setFrozenFrameUrl("");
     clearCaptureTimers();
     stopAutoScan();
-    setGraderMessage("");
-
-    if (!nextFile) return;
-
-    setIsReadingKey(true);
-    try {
-      const canvas = await fileToCanvas(nextFile);
-      const key = extractMultipleChoiceAnswers(canvas);
-      const count = key.filter(Boolean).length;
-      setAnswerKey(key);
-
-      if (count === 0) {
-        setGraderMessage("Chưa nhận diện được đáp án đã tô. Hãy dùng ảnh/PDF phiếu đáp án đúng chụp thẳng và tô rõ.");
-      } else {
-        setGraderMessage(`Đã nhận diện ${count}/${QUESTION_COUNT} đáp án đúng. Nút Bắt đầu đã sẵn sàng.`);
-      }
-    } catch (error) {
-      setGraderMessage(error instanceof Error ? error.message : "Không đọc được file đáp án đúng.");
-    } finally {
-      setIsReadingKey(false);
-    }
+    setIsAnswerKeyEditorOpen(false);
+    setGraderMessage(`Đã lưu đủ ${QUESTION_COUNT}/${QUESTION_COUNT} đáp án đúng. Nút Bắt đầu đã sẵn sàng.`);
   }
 
   function handleStart() {
@@ -436,39 +431,29 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
         <span className="step-number">4</span>
         <div>
           <h2 id="grader-title">Chấm bài tự động</h2>
-          <p>Tải đáp án đúng, đặt tập bài trước camera và để hệ thống tự chấm từng bài vào file Excel.</p>
+          <p>Tạo đáp án đúng theo mẫu 40 câu, đặt tập bài trước camera và để hệ thống tự chấm từng bài vào file Excel.</p>
         </div>
       </div>
 
       <div className="grader-grid">
         <div className="grader-controls">
-          <label className={`answer-key-upload ${answerFile ? "has-file" : ""}`}>
-            <Upload size={24} />
-            <strong>{answerFile ? answerFile.name : "Tải đáp án đúng PDF hoặc ảnh"}</strong>
-            <span>Trên điện thoại có thể chọn chụp ảnh trực tiếp bằng camera.</span>
-            <input
-              type="file"
-              accept="image/*,.pdf,application/pdf"
-              capture="environment"
-              onChange={handleAnswerFileChange}
-            />
-          </label>
+          <button className={`answer-key-upload ${canStart ? "has-file" : ""}`} type="button" onClick={openAnswerKeyEditor}>
+            <FileCheck2 size={24} />
+            <strong>{canStart ? "Sửa đáp án đúng 40 câu" : "Tạo đáp án đúng 40 câu"}</strong>
+            <span>Giáo viên chọn đáp án A, B, C, D theo đúng mẫu phiếu trắc nghiệm 40 câu rồi bấm Lưu.</span>
+          </button>
 
           <div className="status-strip">
             <FileCheck2 size={19} />
             <span>
-              {isReadingKey
-                ? "Đang đọc đáp án đúng..."
-                : answerFile
-                  ? `${detectedAnswerCount}/${QUESTION_COUNT} đáp án đã nhận diện`
-                  : "Chưa tải đáp án đúng"}
+              {canStart ? `${detectedAnswerCount}/${QUESTION_COUNT} đáp án đúng đã lưu` : "Chưa tạo đáp án đúng"}
             </span>
           </div>
 
           <button
             className="primary-button full-width"
             type="button"
-            disabled={sessionStarted || !canStart || isReadingKey}
+            disabled={sessionStarted || !canStart}
             onClick={handleStart}
           >
             <Play size={19} />
@@ -533,6 +518,16 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
             </div>
           )}
         </div>
+      )}
+
+      {isAnswerKeyEditorOpen && (
+        <AnswerKeyEditor
+          answers={draftAnswerKey}
+          selectedCount={draftAnswerCount}
+          onAnswerChange={handleDraftAnswerChange}
+          onClose={() => setIsAnswerKeyEditorOpen(false)}
+          onSave={handleSaveAnswerKey}
+        />
       )}
 
       {lastMetadata && (
@@ -602,45 +597,112 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
   );
 }
 
-async function fileToCanvas(file: File) {
-  if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-    return pdfToCanvas(file);
-  }
+type AnswerKeyEditorProps = {
+  answers: AnswerValue[];
+  selectedCount: number;
+  onAnswerChange: (questionIndex: number, answer: Exclude<AnswerValue, null>) => void;
+  onClose: () => void;
+  onSave: () => void;
+};
 
-  if (!file.type.startsWith("image/")) {
-    throw new Error("Vui lòng tải file PDF hoặc ảnh đáp án đúng.");
-  }
+function AnswerKeyEditor({ answers, selectedCount, onAnswerChange, onClose, onSave }: AnswerKeyEditorProps) {
+  return (
+    <div className="answer-editor-backdrop" role="dialog" aria-modal="true" aria-label="Tạo đáp án đúng 40 câu">
+      <div className="answer-editor-shell">
+        <div className="answer-editor-actions">
+          <button className="ghost-button compact-button" type="button" onClick={onClose}>
+            <X size={17} />
+            <span>Đóng</span>
+          </button>
+          <button className="primary-button compact-button" type="button" onClick={onSave}>
+            <FileCheck2 size={17} />
+            <span>Lưu đáp án</span>
+          </button>
+        </div>
 
-  const bitmap = await createImageBitmap(file);
-  const canvas = document.createElement("canvas");
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
-  canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
-  bitmap.close();
-  return canvas;
+        <div className="answer-sheet-form" aria-label="Mẫu nhập đáp án trắc nghiệm 40 câu">
+          <div className="answer-sheet-frame">
+            <div className="answer-sheet-top">
+              <div className="answer-info-grid">
+                <label>
+                  <span>Họ và tên:</span>
+                  <input value="ĐÁP ÁN ĐÚNG" readOnly aria-label="Họ và tên" />
+                </label>
+                <label>
+                  <span>Môn thi:</span>
+                  <input value="" readOnly aria-label="Môn thi" />
+                </label>
+                <label>
+                  <span>Lớp:</span>
+                  <input value="" readOnly aria-label="Lớp" />
+                </label>
+                <label>
+                  <span>Mã đề:</span>
+                  <input value="" readOnly aria-label="Mã đề" />
+                </label>
+              </div>
+
+              <h3>PHIẾU TRẢ LỜI TRẮC NGHIỆM</h3>
+            </div>
+
+            <div className="answer-sheet-part-title">
+              <span aria-hidden="true">■</span>
+              <strong>PHẦN I</strong>
+            </div>
+
+            <div className="answer-bubble-grid">
+              {[0, 1, 2, 3].map((groupIndex) => (
+                <div className="answer-bubble-group" key={groupIndex}>
+                  <div className="answer-choice-header">
+                    <span />
+                    {CHOICES.map((choice) => (
+                      <span key={choice}>{choice}</span>
+                    ))}
+                  </div>
+
+                  {Array.from({ length: 10 }, (_, rowIndex) => {
+                    const questionIndex = groupIndex * 10 + rowIndex;
+                    const questionNumber = questionIndex + 1;
+
+                    return (
+                      <div className="answer-row" key={questionNumber}>
+                        <span className="answer-question-number">{questionNumber}</span>
+                        {CHOICES.map((choice) => (
+                          <label className="answer-choice" key={choice} aria-label={`Câu ${questionNumber} đáp án ${choice}`}>
+                            <input
+                              type="radio"
+                              name={`answer-${questionNumber}`}
+                              checked={answers[questionIndex] === choice}
+                              onChange={() => onAnswerChange(questionIndex, choice)}
+                            />
+                            <span />
+                          </label>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+
+            <p className="answer-sheet-note">Lưu ý: Phiếu này chỉ dùng cho đề gồm 40 câu trắc nghiệm A, B, C, D.</p>
+          </div>
+        </div>
+
+        <div className="answer-editor-footer">
+          <span>Đã chọn {selectedCount}/{QUESTION_COUNT} đáp án</span>
+          <button className="primary-button" type="button" onClick={onSave}>
+            <FileCheck2 size={18} />
+            <span>Lưu đáp án</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-async function pdfToCanvas(file: File) {
-  const pdfjsModule = await import("pdf-parse/lib/pdf.js/v2.0.550/build/pdf.js");
-  const pdfjs = (pdfjsModule as { default?: unknown }).default ?? pdfjsModule;
-  const getDocument = (pdfjs as { getDocument: (params: unknown) => { promise: Promise<unknown> } }).getDocument;
-  const data = new Uint8Array(await file.arrayBuffer());
-  const documentTask = getDocument({ data, disableWorker: true });
-  const pdfDocument = (await documentTask.promise) as {
-    getPage: (pageNumber: number) => Promise<{
-      getViewport: (params: { scale: number }) => { width: number; height: number };
-      render: (params: unknown) => { promise: Promise<void> };
-    }>;
-  };
-  const page = await pdfDocument.getPage(1);
-  const viewport = page.getViewport({ scale: 2 });
-  const canvas = document.createElement("canvas");
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Không tạo được vùng đọc PDF.");
-  await page.render({ canvasContext: context, viewport }).promise;
-  return canvas;
+function createEmptyAnswerKey(): AnswerValue[] {
+  return Array.from({ length: QUESTION_COUNT }, () => null);
 }
 
 function captureVideoCanvas(video: HTMLVideoElement) {

@@ -1,7 +1,9 @@
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import PdfPrinter from "pdfmake";
 
+const require = createRequire(import.meta.url);
 const outputPath = path.resolve("output/pdf/mau-phieu-trac-nghiem-2025-rut-gon.pdf");
 const pink = "#d56b92";
 const lightPink = "#fff1f6";
@@ -341,8 +343,18 @@ function getFonts() {
   );
 
   if (!fontSet) {
-    throw new Error("Khong tim thay font Unicode de tao PDF.");
+    return { Arial: getBundledRobotoFonts() };
   }
 
   return { Arial: fontSet };
+}
+
+function getBundledRobotoFonts() {
+  const vfs = require("pdfmake/build/vfs_fonts.js");
+  return {
+    normal: Buffer.from(vfs["Roboto-Regular.ttf"], "base64"),
+    bold: Buffer.from(vfs["Roboto-Medium.ttf"], "base64"),
+    italics: Buffer.from(vfs["Roboto-Italic.ttf"], "base64"),
+    bolditalics: Buffer.from(vfs["Roboto-MediumItalic.ttf"], "base64")
+  };
 }

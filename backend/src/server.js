@@ -6,8 +6,10 @@ import multer from "multer";
 import pdfParse from "pdf-parse";
 import PdfPrinter from "pdfmake";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 
+const require = createRequire(import.meta.url);
 const app = express();
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -584,11 +586,23 @@ function getFonts() {
   );
 
   if (!fontSet) {
-    throw new Error("Khong tim thay font Unicode de tao PDF.");
+    return {
+      Roboto: getBundledRobotoFonts()
+    };
   }
 
   return {
     Roboto: fontSet
+  };
+}
+
+function getBundledRobotoFonts() {
+  const vfs = require("pdfmake/build/vfs_fonts.js");
+  return {
+    normal: Buffer.from(vfs["Roboto-Regular.ttf"], "base64"),
+    bold: Buffer.from(vfs["Roboto-Medium.ttf"], "base64"),
+    italics: Buffer.from(vfs["Roboto-Italic.ttf"], "base64"),
+    bolditalics: Buffer.from(vfs["Roboto-MediumItalic.ttf"], "base64")
   };
 }
 

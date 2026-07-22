@@ -968,6 +968,42 @@ textarea:focus {
   color: #1e6b5f;
 }
 
+.score-result-card {
+  display: grid;
+  gap: 8px;
+  margin-top: 15px;
+  border: 1px solid #9fd4b6;
+  border-radius: 8px;
+  background: #effaf4;
+  padding: 16px;
+  color: #1c6342;
+}
+
+.score-result-card div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.score-result-card span {
+  color: #275d45;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.score-result-card strong {
+  color: #12492f;
+  font-size: 44px;
+  line-height: 0.95;
+}
+
+.score-result-card p {
+  margin: 0;
+  color: #275d45;
+  font-weight: 850;
+}
+
 .student-form {
   display: grid;
   grid-template-columns: 1fr 0.62fr;
@@ -1476,6 +1512,14 @@ textarea:focus {
 
   .detected-strip {
     grid-template-columns: 1fr;
+  }
+
+  .score-result-card {
+    padding: 13px;
+  }
+
+  .score-result-card strong {
+    font-size: 38px;
   }
 
   .camera-frame {

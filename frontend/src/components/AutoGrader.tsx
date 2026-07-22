@@ -52,6 +52,7 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
   const [isGrading, setIsGrading] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   const [lastMetadata, setLastMetadata] = useState<StudentMetadata | null>(null);
+  const [lastScoreResult, setLastScoreResult] = useState<StudentResult | null>(null);
 
   const detectedAnswerCount = useMemo(() => answerKey.filter(Boolean).length, [answerKey]);
   const canStart = Boolean(answerFile) && detectedAnswerCount > 0;
@@ -120,6 +121,8 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
     setAnswerFile(nextFile);
     setAnswerKey([]);
     setSessionStarted(false);
+    setLastMetadata(null);
+    setLastScoreResult(null);
     setGraderMessage("");
 
     if (!nextFile) return;
@@ -164,6 +167,7 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
 
     setIsGrading(true);
     setOcrProgress(0);
+    setLastScoreResult(null);
     setGraderMessage("Đang chụp phiếu, nhận diện họ tên/lớp/mã đề và đối chiếu đáp án...");
 
     try {
@@ -176,22 +180,22 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
         return sum + (studentAnswers[index] === keyAnswer ? 1 : 0);
       }, 0);
       const score = total > 0 ? Number(((correct / total) * 10).toFixed(2)) : 0;
+      const nextResult = {
+        id: Date.now(),
+        name: metadata.name,
+        className: metadata.className,
+        examCode: metadata.examCode,
+        correct,
+        total,
+        score
+      };
 
       setLastMetadata(metadata);
-      setResults((current) => [
-        ...current,
-        {
-          id: Date.now(),
-          name: metadata.name,
-          className: metadata.className,
-          examCode: metadata.examCode,
-          correct,
-          total,
-          score
-        }
-      ]);
+      setLastScoreResult(nextResult);
+      setResults((current) => [...current, nextResult]);
       setGraderMessage(`Đã chấm xong ${correct}/${total} câu và nhận diện thông tin học sinh. Tiếp tục phiếu kế tiếp.`);
     } catch (error) {
+      setLastScoreResult(null);
       setGraderMessage(error instanceof Error ? error.message : "Không thể nhận diện thông tin trên phiếu.");
     } finally {
       setIsGrading(false);
@@ -327,6 +331,19 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
           <span>
             <strong>Mã đề:</strong> {lastMetadata.examCode}
           </span>
+        </div>
+      )}
+
+      {lastScoreResult && (
+        <div className="score-result-card" aria-live="polite" aria-label="Điểm bài vừa chấm">
+          <div>
+            <span>Điểm bài vừa quét</span>
+            <strong>{formatScore(lastScoreResult.score)}</strong>
+          </div>
+          <p>
+            Đúng {lastScoreResult.correct}/{lastScoreResult.total} câu
+            {lastScoreResult.name !== "Chưa nhận diện" ? ` - ${lastScoreResult.name}` : ""}
+          </p>
         </div>
       )}
 
@@ -620,6 +637,10 @@ function foldVietnamese(value: string) {
     .replace(/đ/g, "d")
     .replace(/Đ/g, "D")
     .toLowerCase();
+}
+
+function formatScore(score: number) {
+  return Number.isInteger(score) ? String(score) : score.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 function buildExcelHtml(results: StudentResult[]) {

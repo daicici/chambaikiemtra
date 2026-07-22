@@ -859,6 +859,41 @@ input:focus {
   font-weight: 800;
 }
 
+.ocr-hint,
+.detected-strip {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #dce3de;
+  border-radius: 8px;
+  background: #f7faf8;
+  color: #33463d;
+}
+
+.ocr-hint {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  padding: 11px 12px;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.detected-strip {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 15px;
+  padding: 12px;
+  font-size: 13px;
+}
+
+.detected-strip span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.detected-strip strong {
+  color: #1e6b5f;
+}
+
 .student-form {
   display: grid;
   grid-template-columns: 1fr 0.62fr;
@@ -924,7 +959,7 @@ input:focus {
 
 .result-table {
   width: 100%;
-  min-width: 560px;
+  min-width: 650px;
   border-collapse: collapse;
   background: #ffffff;
 }
@@ -1257,8 +1292,14 @@ input:focus {
   }
 
   .status-strip,
-  .camera-caption {
+  .camera-caption,
+  .ocr-hint,
+  .detected-strip {
     font-size: 12px;
+  }
+
+  .detected-strip {
+    grid-template-columns: 1fr;
   }
 
   .camera-frame {
@@ -1271,7 +1312,7 @@ input:focus {
   }
 
   .result-table {
-    min-width: 460px;
+    min-width: 560px;
   }
 
   .modal-backdrop {
@@ -1355,6 +1396,6 @@ input:focus {
   }
 
   .result-table {
-    min-width: 420px;
+    min-width: 520px;
   }
 }

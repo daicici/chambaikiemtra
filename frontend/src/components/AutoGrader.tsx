@@ -13,12 +13,26 @@ type StudentResult = {
   id: number;
   name: string;
   className: string;
+  examCode: string;
   correct: number;
   total: number;
   score: number;
 };
 
 type AnswerValue = "A" | "B" | "C" | "D" | null;
+
+type OcrWorker = {
+  recognize: (image: HTMLCanvasElement) => Promise<{ data: { text: string } }>;
+  setParameters: (params: Record<string, string>) => Promise<unknown>;
+  terminate: () => Promise<unknown>;
+};
+
+type StudentMetadata = {
+  name: string;
+  className: string;
+  examCode: string;
+  rawText: string;
+};
 
 const QUESTION_COUNT = 40;
 const CHOICES: Exclude<AnswerValue, null>[] = ["A", "B", "C", "D"];
@@ -27,19 +41,21 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
   const isSignedIn = accountState === "active" || accountState === "trial";
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const ocrWorkerRef = useRef<OcrWorker | null>(null);
   const [answerFile, setAnswerFile] = useState<File | null>(null);
   const [answerKey, setAnswerKey] = useState<AnswerValue[]>([]);
   const [sessionStarted, setSessionStarted] = useState(false);
-  const [studentName, setStudentName] = useState("");
-  const [studentClass, setStudentClass] = useState("");
   const [results, setResults] = useState<StudentResult[]>([]);
   const [cameraMessage, setCameraMessage] = useState("");
   const [graderMessage, setGraderMessage] = useState("");
   const [isReadingKey, setIsReadingKey] = useState(false);
+  const [isGrading, setIsGrading] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const [lastMetadata, setLastMetadata] = useState<StudentMetadata | null>(null);
 
   const detectedAnswerCount = useMemo(() => answerKey.filter(Boolean).length, [answerKey]);
   const canStart = Boolean(answerFile) && detectedAnswerCount > 0;
-  const canCapture = sessionStarted && canStart && Boolean(studentName.trim()) && Boolean(studentClass.trim());
+  const canCapture = sessionStarted && canStart && !isGrading;
 
   useEffect(() => {
     if (!isSignedIn) {
@@ -84,6 +100,13 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
     };
   }, [isSignedIn]);
 
+  useEffect(() => {
+    return () => {
+      ocrWorkerRef.current?.terminate();
+      ocrWorkerRef.current = null;
+    };
+  }, []);
+
   function stopCurrentCamera() {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
@@ -123,10 +146,10 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
   function handleStart() {
     if (!canStart) return;
     setSessionStarted(true);
-    setGraderMessage("Đã bắt đầu chấm bài. Nhập tên, lớp rồi chụp phiếu của từng học sinh.");
+    setGraderMessage("Đã bắt đầu chấm bài. Đặt phiếu thẳng trong khung camera rồi chụp từng học sinh.");
   }
 
-  function handleCaptureAndGrade() {
+  async function handleCaptureAndGrade() {
     const video = videoRef.current;
     if (!video || video.readyState < 2) {
       setGraderMessage("Camera chưa có hình ảnh để chụp.");
@@ -139,35 +162,65 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
     const context = canvas.getContext("2d");
     if (!context) return;
 
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const studentAnswers = extractMultipleChoiceAnswers(canvas);
-    const total = detectedAnswerCount;
-    const correct = answerKey.reduce((sum, keyAnswer, index) => {
-      if (!keyAnswer) return sum;
-      return sum + (studentAnswers[index] === keyAnswer ? 1 : 0);
-    }, 0);
-    const score = total > 0 ? Number(((correct / total) * 10).toFixed(2)) : 0;
+    setIsGrading(true);
+    setOcrProgress(0);
+    setGraderMessage("Đang chụp phiếu, nhận diện họ tên/lớp/mã đề và đối chiếu đáp án...");
 
-    setResults((current) => [
-      ...current,
-      {
-        id: Date.now(),
-        name: studentName.trim(),
-        className: studentClass.trim(),
-        correct,
-        total,
-        score
-      }
-    ]);
-    setStudentName("");
-    setStudentClass("");
-    setGraderMessage(`Đã chấm xong ${correct}/${total} câu. Tiếp tục nhập học sinh kế tiếp.`);
+    try {
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const metadata = await extractStudentMetadata(canvas, getOcrWorker, setOcrProgress);
+      const studentAnswers = extractMultipleChoiceAnswers(canvas);
+      const total = detectedAnswerCount;
+      const correct = answerKey.reduce((sum, keyAnswer, index) => {
+        if (!keyAnswer) return sum;
+        return sum + (studentAnswers[index] === keyAnswer ? 1 : 0);
+      }, 0);
+      const score = total > 0 ? Number(((correct / total) * 10).toFixed(2)) : 0;
+
+      setLastMetadata(metadata);
+      setResults((current) => [
+        ...current,
+        {
+          id: Date.now(),
+          name: metadata.name,
+          className: metadata.className,
+          examCode: metadata.examCode,
+          correct,
+          total,
+          score
+        }
+      ]);
+      setGraderMessage(`Đã chấm xong ${correct}/${total} câu và nhận diện thông tin học sinh. Tiếp tục phiếu kế tiếp.`);
+    } catch (error) {
+      setGraderMessage(error instanceof Error ? error.message : "Không thể nhận diện thông tin trên phiếu.");
+    } finally {
+      setIsGrading(false);
+    }
   }
 
   function handleDownloadExcel() {
     const html = buildExcelHtml(results);
     const blob = new Blob(["\ufeff", html], { type: "application/vnd.ms-excel;charset=utf-8" });
     downloadBlob(blob, "ket-qua-cham-bai-trac-nghiem.xls");
+  }
+
+  async function getOcrWorker() {
+    if (ocrWorkerRef.current) return ocrWorkerRef.current;
+
+    const { createWorker } = await import("tesseract.js");
+    const worker = (await createWorker("vie+eng", 1, {
+      logger: (message: { status?: string; progress?: number }) => {
+        if (message.status === "recognizing text" && typeof message.progress === "number") {
+          setOcrProgress(Math.round(message.progress * 100));
+        }
+      }
+    })) as OcrWorker;
+    await worker.setParameters({
+      preserve_interword_spaces: "1",
+      tessedit_pageseg_mode: "6"
+    });
+    ocrWorkerRef.current = worker;
+    return worker;
   }
 
   if (!isSignedIn) {
@@ -236,20 +289,14 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
             <span>Bắt đầu</span>
           </button>
 
-          <div className="student-form">
-            <label>
-              Họ và tên học sinh
-              <input value={studentName} onChange={(event) => setStudentName(event.target.value)} />
-            </label>
-            <label>
-              Lớp
-              <input value={studentClass} onChange={(event) => setStudentClass(event.target.value)} />
-            </label>
+          <div className="ocr-hint">
+            <FileCheck2 size={18} />
+            <span>Thông tin Họ tên, Lớp và Mã đề sẽ được nhận diện tự động từ vùng đầu phiếu khi chụp.</span>
           </div>
 
           <button className="primary-button full-width free-button" type="button" disabled={!canCapture} onClick={handleCaptureAndGrade}>
             <Camera size={19} />
-            <span>Chụp và chấm bài</span>
+            <span>{isGrading ? `Đang nhận diện ${ocrProgress}%` : "Chụp, nhận diện và chấm bài"}</span>
           </button>
 
           <button className="ghost-button full-width" type="button" disabled={results.length === 0} onClick={handleDownloadExcel}>
@@ -269,7 +316,21 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
         </div>
       </div>
 
-      {graderMessage && <Notice state={detectedAnswerCount > 0 ? "done" : "idle"} message={graderMessage} />}
+      {lastMetadata && (
+        <div className="detected-strip" aria-label="Thông tin nhận diện gần nhất">
+          <span>
+            <strong>Họ tên:</strong> {lastMetadata.name}
+          </span>
+          <span>
+            <strong>Lớp:</strong> {lastMetadata.className}
+          </span>
+          <span>
+            <strong>Mã đề:</strong> {lastMetadata.examCode}
+          </span>
+        </div>
+      )}
+
+      {graderMessage && <Notice state={isGrading ? "working" : detectedAnswerCount > 0 ? "done" : "idle"} message={graderMessage} />}
 
       {results.length > 0 && (
         <div className="result-panel" aria-label="Bảng kết quả chấm bài">
@@ -283,6 +344,7 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
                 <tr>
                   <th>Họ và tên</th>
                   <th>Lớp</th>
+                  <th>Mã đề</th>
                   <th>Số câu đúng/Tổng số câu</th>
                   <th>Điểm</th>
                 </tr>
@@ -292,6 +354,7 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
                   <tr key={result.id}>
                     <td>{result.name}</td>
                     <td>{result.className}</td>
+                    <td>{result.examCode}</td>
                     <td>
                       {result.correct}/{result.total}
                     </td>
@@ -435,6 +498,130 @@ function sampleDarkness(imageData: ImageData, width: number, height: number, cen
   return count ? total / count : 0;
 }
 
+async function extractStudentMetadata(
+  source: HTMLCanvasElement,
+  getOcrWorker: () => Promise<OcrWorker>,
+  onProgress: (progress: number) => void
+): Promise<StudentMetadata> {
+  onProgress(0);
+  const ocrCanvas = createStudentInfoCanvas(source);
+  const worker = await getOcrWorker();
+  const {
+    data: { text }
+  } = await worker.recognize(ocrCanvas);
+  onProgress(100);
+  return parseStudentMetadata(text);
+}
+
+function createStudentInfoCanvas(source: HTMLCanvasElement) {
+  const normalized = normalizeCanvas(source, 1200, 1697);
+  const cropHeight = Math.round(normalized.height * 0.23);
+  const scale = 1.45;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(normalized.width * scale);
+  canvas.height = Math.round(cropHeight * scale);
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) return canvas;
+
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(normalized, 0, 0, normalized.width, cropHeight, 0, 0, canvas.width, canvas.height);
+
+  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+  for (let index = 0; index < imageData.data.length; index += 4) {
+    const red = imageData.data[index];
+    const green = imageData.data[index + 1];
+    const blue = imageData.data[index + 2];
+    const gray = red * 0.3 + green * 0.59 + blue * 0.11;
+    const highContrast = gray > 182 ? 255 : Math.max(0, gray - 34);
+    imageData.data[index] = highContrast;
+    imageData.data[index + 1] = highContrast;
+    imageData.data[index + 2] = highContrast;
+  }
+  context.putImageData(imageData, 0, 0);
+
+  return canvas;
+}
+
+function parseStudentMetadata(rawText: string): StudentMetadata {
+  const cleanedText = rawText
+    .replace(/\r/g, "\n")
+    .replace(/[|]/g, " ")
+    .replace(/[“”]/g, '"')
+    .replace(/[’]/g, "'")
+    .trim();
+  const lines = cleanedText
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  return {
+    name: findFieldValue(lines, ["ho va ten", "ho ten", "ten"], ["lop", "ma de", "mon", "truong"]) || "Chưa nhận diện",
+    className: findFieldValue(lines, ["lop", "l0p"], ["ma de", "mon", "truong", "ho va ten"]) || "Chưa nhận diện",
+    examCode: findFieldValue(lines, ["ma de", "ma de thi", "made", "ma oe"], ["lop", "mon", "truong"]) || "Chưa nhận diện",
+    rawText: cleanedText
+  };
+}
+
+function findFieldValue(lines: string[], labels: string[], nextLabels: string[]) {
+  for (const line of lines) {
+    const foldedLine = foldVietnamese(line);
+    const matchedLabel = labels.find((label) => foldedLine.includes(label));
+    if (!matchedLabel) continue;
+
+    const startIndex = Math.min(foldedLine.indexOf(matchedLabel) + matchedLabel.length, line.length);
+    let value = line.slice(startIndex);
+    for (const nextLabel of nextLabels) {
+      const nextIndex = foldVietnamese(value).indexOf(nextLabel);
+      if (nextIndex >= 0) {
+        value = value.slice(0, nextIndex);
+      }
+    }
+
+    const normalizedValue = cleanFieldValue(value);
+    if (normalizedValue) return normalizedValue;
+  }
+
+  const compact = lines.join(" ");
+  const foldedCompact = foldVietnamese(compact);
+  for (const label of labels) {
+    const startIndex = foldedCompact.indexOf(label);
+    if (startIndex < 0) continue;
+
+    let endIndex = compact.length;
+    for (const nextLabel of nextLabels) {
+      const candidate = foldedCompact.indexOf(nextLabel, startIndex + label.length);
+      if (candidate > startIndex && candidate < endIndex) {
+        endIndex = candidate;
+      }
+    }
+
+    const value = cleanFieldValue(compact.slice(startIndex + label.length, endIndex));
+    if (value) return value;
+  }
+
+  return "";
+}
+
+function cleanFieldValue(value: string) {
+  return value
+    .replace(/^[\s:：.\-_/\\]+/, "")
+    .replace(/[._]{2,}/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^(la|là)\s+/i, "")
+    .trim()
+    .slice(0, 80);
+}
+
+function foldVietnamese(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase();
+}
+
 function buildExcelHtml(results: StudentResult[]) {
   const rows = results
     .map(
@@ -442,6 +629,7 @@ function buildExcelHtml(results: StudentResult[]) {
         <tr>
           <td>${escapeHtml(result.name)}</td>
           <td>${escapeHtml(result.className)}</td>
+          <td>${escapeHtml(result.examCode)}</td>
           <td>${result.correct}/${result.total}</td>
           <td>${result.score}</td>
         </tr>`
@@ -457,6 +645,7 @@ function buildExcelHtml(results: StudentResult[]) {
             <tr>
               <th>Họ và tên</th>
               <th>Lớp</th>
+              <th>Mã đề</th>
               <th>Số câu đúng/Tổng số câu</th>
               <th>Điểm</th>
             </tr>

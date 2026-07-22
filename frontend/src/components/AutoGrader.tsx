@@ -1,4 +1,4 @@
-import { Camera, FileCheck2, FileSpreadsheet, Lock, Play, Square, Upload } from "lucide-react";
+import { Camera, FileCheck2, FileSpreadsheet, Lock, Play, Upload, X } from "lucide-react";
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { AccountState } from "../types";
 import { downloadBlob } from "../utils/file";
@@ -40,6 +40,7 @@ const STABLE_FRAME_DIFF = 5.5;
 const CHANGE_FRAME_DIFF = 16;
 const STABLE_CAPTURE_MS = 1400;
 const SCAN_INTERVAL_MS = 360;
+const SCORE_DISPLAY_MS = 1800;
 
 type ScanState = {
   signature: number[] | null;
@@ -54,6 +55,8 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
   const streamRef = useRef<MediaStream | null>(null);
   const ocrWorkerRef = useRef<OcrWorker | null>(null);
   const scanIntervalRef = useRef<number | null>(null);
+  const flashTimeoutRef = useRef<number | null>(null);
+  const scoreTimeoutRef = useRef<number | null>(null);
   const scanStateRef = useRef<ScanState>({
     signature: null,
     stableSince: 0,
@@ -71,6 +74,9 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
   const [ocrProgress, setOcrProgress] = useState(0);
   const [lastMetadata, setLastMetadata] = useState<StudentMetadata | null>(null);
   const [lastScoreResult, setLastScoreResult] = useState<StudentResult | null>(null);
+  const [fullscreenScoreResult, setFullscreenScoreResult] = useState<StudentResult | null>(null);
+  const [frozenFrameUrl, setFrozenFrameUrl] = useState("");
+  const [isCaptureFlash, setIsCaptureFlash] = useState(false);
 
   const detectedAnswerCount = useMemo(() => answerKey.filter(Boolean).length, [answerKey]);
   const canStart = Boolean(answerFile) && detectedAnswerCount > 0;
@@ -104,7 +110,7 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
-        setCameraMessage("Camera đã sẵn sàng. Có thể chụp từng phiếu sau khi tải đáp án đúng.");
+        setCameraMessage("Camera đã sẵn sàng. Tải đáp án đúng rồi bấm Bắt đầu để chấm toàn màn hình.");
       } catch {
         setCameraMessage("Không mở được camera. Vui lòng cấp quyền camera cho trình duyệt.");
       }
@@ -121,10 +127,28 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
   useEffect(() => {
     return () => {
       stopAutoScan();
+      clearCaptureTimers();
       ocrWorkerRef.current?.terminate();
       ocrWorkerRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [sessionStarted]);
+
+  useEffect(() => {
+    if (!sessionStarted) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [sessionStarted]);
 
   useEffect(() => {
     if (!sessionStarted || !canStart || !isSignedIn) {
@@ -154,6 +178,9 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
     setSessionStarted(false);
     setLastMetadata(null);
     setLastScoreResult(null);
+    setFullscreenScoreResult(null);
+    setFrozenFrameUrl("");
+    clearCaptureTimers();
     stopAutoScan();
     setGraderMessage("");
 
@@ -181,6 +208,9 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
   function handleStart() {
     if (!canStart) return;
     setLastScoreResult(null);
+    setFullscreenScoreResult(null);
+    setFrozenFrameUrl("");
+    clearCaptureTimers();
     setSessionStarted(true);
     setGraderMessage("Đã bắt đầu chấm tự động. Đặt tập bài trước camera và giữ bài đầu tiên ổn định trong khung.");
   }
@@ -188,8 +218,23 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
   function handleStop() {
     setSessionStarted(false);
     stopAutoScan();
+    clearCaptureTimers();
     setIsGrading(false);
+    setFrozenFrameUrl("");
+    setFullscreenScoreResult(null);
+    setIsCaptureFlash(false);
     setGraderMessage("Đã dừng chấm tự động. Bạn có thể tải file Excel hoặc bấm Bắt đầu để chấm tiếp.");
+  }
+
+  function clearCaptureTimers() {
+    if (flashTimeoutRef.current !== null) {
+      window.clearTimeout(flashTimeoutRef.current);
+      flashTimeoutRef.current = null;
+    }
+    if (scoreTimeoutRef.current !== null) {
+      window.clearTimeout(scoreTimeoutRef.current);
+      scoreTimeoutRef.current = null;
+    }
   }
 
   function startAutoScan() {
@@ -250,11 +295,39 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
           return;
         }
 
+        if (scoreTimeoutRef.current !== null) {
+          window.clearTimeout(scoreTimeoutRef.current);
+          scoreTimeoutRef.current = null;
+        }
+        setFrozenFrameUrl(canvas.toDataURL("image/jpeg", 0.86));
+        setIsCaptureFlash(true);
+        if (flashTimeoutRef.current !== null) {
+          window.clearTimeout(flashTimeoutRef.current);
+        }
+        flashTimeoutRef.current = window.setTimeout(() => {
+          setIsCaptureFlash(false);
+          flashTimeoutRef.current = null;
+        }, 240);
+
         const success = await gradeCapturedCanvas(canvas);
         scanState.waitingForChange = success;
         scanState.stableSince = 0;
-        scanState.signature = null;
+        scanState.signature = success ? signature : null;
         scanState.inFlight = false;
+
+        if (success) {
+          if (scoreTimeoutRef.current !== null) {
+            window.clearTimeout(scoreTimeoutRef.current);
+          }
+          scoreTimeoutRef.current = window.setTimeout(() => {
+            setFrozenFrameUrl("");
+            setFullscreenScoreResult(null);
+            scoreTimeoutRef.current = null;
+          }, SCORE_DISPLAY_MS);
+        } else {
+          setFrozenFrameUrl("");
+          setFullscreenScoreResult(null);
+        }
       }
       return;
     }
@@ -266,6 +339,7 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
     setIsGrading(true);
     setOcrProgress(0);
     setLastScoreResult(null);
+    setFullscreenScoreResult(null);
     setGraderMessage("Đang tự động chụp, nhận diện họ tên/lớp/mã đề và đối chiếu đáp án...");
 
     try {
@@ -289,6 +363,7 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
 
       setLastMetadata(metadata);
       setLastScoreResult(nextResult);
+      setFullscreenScoreResult(nextResult);
       setResults((current) => [...current, nextResult]);
       setGraderMessage(
         `Đã chấm xong ${correct}/${total} câu. Hãy nhấc bài vừa chấm ra khỏi tập, hệ thống sẽ tự chấm bài kế tiếp.`
@@ -296,6 +371,7 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
       return true;
     } catch (error) {
       setLastScoreResult(null);
+      setFullscreenScoreResult(null);
       setGraderMessage(error instanceof Error ? error.message : "Không thể nhận diện thông tin trên phiếu.");
       return false;
     } finally {
@@ -360,7 +436,7 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
         <span className="step-number">4</span>
         <div>
           <h2 id="grader-title">Chấm bài tự động</h2>
-          <p>Tải đáp án đúng, chụp phiếu trả lời của từng học sinh và xuất kết quả thành file Excel.</p>
+          <p>Tải đáp án đúng, đặt tập bài trước camera và để hệ thống tự chấm từng bài vào file Excel.</p>
         </div>
       </div>
 
@@ -407,13 +483,6 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
             </span>
           </div>
 
-          {sessionStarted && (
-            <button className="ghost-button full-width" type="button" onClick={handleStop}>
-              <Square size={17} />
-              <span>Dừng chấm tự động</span>
-            </button>
-          )}
-
           <button className="ghost-button full-width" type="button" disabled={results.length === 0} onClick={handleDownloadExcel}>
             <FileSpreadsheet size={19} />
             <span>Tải file kết quả Excel</span>
@@ -422,7 +491,13 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
 
         <div className="camera-panel">
           <div className="camera-frame">
-            <video ref={videoRef} className="camera-video" autoPlay muted playsInline />
+            {!sessionStarted && <video ref={videoRef} className="camera-video" autoPlay muted playsInline />}
+            {sessionStarted && (
+              <div className="camera-standby">
+                <Camera size={24} />
+                <span>Đang chấm trong chế độ toàn màn hình</span>
+              </div>
+            )}
           </div>
           <div className="camera-caption">
             <Camera size={18} />
@@ -430,6 +505,35 @@ export function AutoGrader({ accountState, onRequireAuth }: AutoGraderProps) {
           </div>
         </div>
       </div>
+
+      {sessionStarted && (
+        <div className="grading-fullscreen" role="dialog" aria-modal="true" aria-label="Chấm bài tự động toàn màn hình">
+          <video ref={videoRef} className="grading-fullscreen-video" autoPlay muted playsInline />
+          {frozenFrameUrl && <img className="grading-frozen-frame" src={frozenFrameUrl} alt="Ảnh bài vừa được chụp để chấm" />}
+          {isCaptureFlash && <div className="grading-capture-flash" aria-hidden="true" />}
+
+          <button className="grading-close-button" type="button" onClick={handleStop} aria-label="Thoát chấm bài tự động">
+            <X size={22} />
+          </button>
+
+          <div className="grading-overlay-status">
+            <span className={`grading-live-dot ${isGrading ? "working" : ""}`} />
+            <strong>{isGrading ? `Đang chấm ${ocrProgress}%` : "Camera đang tự nhận diện"}</strong>
+            <p>{graderMessage || "Đặt bài kiểm tra ngay ngắn trong khung camera."}</p>
+          </div>
+
+          {fullscreenScoreResult && (
+            <div className="grading-score-overlay" aria-live="polite">
+              <span>Điểm</span>
+              <strong>{formatScore(fullscreenScoreResult.score)}</strong>
+              <p>
+                Đúng {fullscreenScoreResult.correct}/{fullscreenScoreResult.total} câu
+                {fullscreenScoreResult.name !== "Chưa nhận diện" ? ` - ${fullscreenScoreResult.name}` : ""}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {lastMetadata && (
         <div className="detected-strip" aria-label="Thông tin nhận diện gần nhất">

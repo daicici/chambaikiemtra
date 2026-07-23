@@ -15,6 +15,7 @@ const REMOVAL_POLL_MS = 350;
 const REMOVAL_SETTLE_MS = 900;
 const REMOVAL_DIFF_THRESHOLD = 16;
 const REMOVAL_DIFF_FRAMES = 2;
+const FIRST_SCAN_DELAY_MS = 650;
 
 function sleep(ms: number) {
   return new Promise<void>((resolve) => window.setTimeout(resolve, ms));
@@ -47,6 +48,10 @@ function signatureDistance(first: number[], second: number[]) {
   return total / first.length;
 }
 
+function withoutAnnotatedImage(result: GradingResult): GradingResult {
+  return { ...result, annotated_image: null };
+}
+
 export function useScanner(videoRef: RefObject<HTMLVideoElement | null>) {
   const [phase, setPhase] = useState<ScannerPhase>("idle");
   const [message, setMessage] = useState("Bấm Bắt đầu để quét và chấm tự động.");
@@ -64,7 +69,7 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>) {
   }, []);
 
   const saveResult = useCallback((result: GradingResult) => {
-    const results = [...loadResults(), result];
+    const results = [...loadResults(), withoutAnnotatedImage(result)];
     saveResults(results);
     setCurrentResult(result);
   }, []);
@@ -98,6 +103,7 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>) {
   );
 
   const runAutoScan = useCallback(async () => {
+    await sleep(FIRST_SCAN_DELAY_MS);
     while (runningRef.current) {
       const video = videoRef.current;
       if (!isVideoReady(video)) {
@@ -124,16 +130,22 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>) {
           return;
         }
 
-        setFrozenFrameUrl(previewUrl);
-        previewUrl = null;
+        if (result.annotated_image) {
+          setFrozenFrameUrl(result.annotated_image);
+          URL.revokeObjectURL(previewUrl);
+          previewUrl = null;
+        } else {
+          setFrozenFrameUrl(previewUrl);
+          previewUrl = null;
+        }
         setFlashKey((key) => key + 1);
 
         if (result.duplicate) {
           setPhase("waiting-removal");
           setMessage("Phiếu này đã được chấm trước đó. Hãy nhấc phiếu ra để quét phiếu tiếp theo.");
           await sleep(AFTER_SUCCESS_FREEZE_MS);
-          setFrozenFrameUrl(null);
           await waitForSheetRemoval(baseline);
+          setFrozenFrameUrl(null);
           continue;
         }
 
@@ -141,8 +153,8 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>) {
         setPhase("saved");
         setMessage(`Đã chấm xong: ${result.score}/${result.max_score} điểm. Kết quả đã được đưa vào danh sách xuất Excel.`);
         await sleep(AFTER_SUCCESS_FREEZE_MS);
-        setFrozenFrameUrl(null);
         await waitForSheetRemoval(baseline);
+        setFrozenFrameUrl(null);
       } catch (error) {
         if (previewUrl) URL.revokeObjectURL(previewUrl);
         setFrozenFrameUrl(null);
@@ -193,7 +205,7 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>) {
       const blob = await captureFrame(video);
       const answerKey = loadAnswerKey();
       const result = await scanSheet(blob, answerKey);
-      const results = [...loadResults(), result];
+      const results = [...loadResults(), withoutAnnotatedImage(result)];
       saveResults(results);
       setCurrentResult(result);
       setPhase("done");

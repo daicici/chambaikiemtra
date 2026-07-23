@@ -14,6 +14,7 @@ export function ScannerScreen() {
   const scanner = useScanner(camera.videoRef);
   const didAutoOpenCamera = useRef(false);
   const statusMessage = camera.stream ? scanner.message : camera.message;
+  const isScanning = scanner.phase === "detecting" || scanner.phase === "grading";
 
   const handleStart = useCallback(async () => {
     const cameraReady = camera.stream ? true : await camera.start();
@@ -39,7 +40,7 @@ export function ScannerScreen() {
         </Link>
       </div>
       <div className="scanner-grid">
-        <CameraPreview videoRef={camera.videoRef} flashKey={scanner.flashKey} frozenFrameUrl={scanner.frozenFrameUrl} />
+        <CameraPreview videoRef={camera.videoRef} flashKey={scanner.flashKey} frozenFrameUrl={scanner.frozenFrameUrl} isScanning={isScanning} />
         <div className="status-list">
           <CameraControls isRunning={scanner.isRunning} isBusy={scanner.phase === "grading"} onStart={handleStart} onStop={scanner.stopAutoScan} />
           <ScannerMessage message={statusMessage} />

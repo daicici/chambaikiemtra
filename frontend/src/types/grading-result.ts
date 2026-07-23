@@ -36,4 +36,5 @@ export type GradingResult = {
   max_score: number;
   status: "ok" | "needs_review" | "rejected" | "duplicate";
   messages: string[];
+  annotated_image?: string | null;
 };

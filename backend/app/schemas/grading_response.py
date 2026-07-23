@@ -42,3 +42,4 @@ class GradingResponse(BaseModel):
     max_score: float
     status: SheetStatus
     messages: list[str]
+    annotated_image: str | None = None

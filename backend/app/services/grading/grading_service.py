@@ -16,6 +16,7 @@ from ..image_quality.quality_validator import validate_image_quality
 from ..omr.omr_pipeline import recognize_40_answers
 from ..student_information.information_validator import recognize_student_information
 from ...temporary.cleanup import cleanup_after_scan
+from .annotated_image import build_annotated_image
 from .answer_comparator import attach_correct_answers
 from .score_calculator import summarize_score
 
@@ -33,6 +34,7 @@ async def grade_uploaded_sheet(file: UploadFile, answer_key: AnswerKeyPayload) -
     compared = attach_correct_answers(recognized, answer_key)
     summary = summarize_score(compared, answer_key.max_score)
     student = recognize_student_information(aligned_sheet, answer_key)
+    annotated_image = build_annotated_image(aligned_sheet, compared)
 
     status = "duplicate" if duplicate else "ok"
     if quality.warnings or summary["review_count"] > 0:
@@ -50,5 +52,6 @@ async def grade_uploaded_sheet(file: UploadFile, answer_key: AnswerKeyPayload) -
         max_score=answer_key.max_score,
         messages=messages,
         status=status,
+        annotated_image=annotated_image,
         **summary,
     )

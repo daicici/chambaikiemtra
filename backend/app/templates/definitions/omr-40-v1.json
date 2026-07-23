@@ -5,6 +5,12 @@
   "normalizedHeight": 707,
   "questions": 40,
   "choices": ["A", "B", "C", "D"],
+  "markers": {
+    "topLeft": { "x": 59.0, "y": 57.8 },
+    "topRight": { "x": 941.9, "y": 57.8 },
+    "bottomRight": { "x": 941.9, "y": 657.8 },
+    "bottomLeft": { "x": 59.0, "y": 657.8 }
+  },
   "groups": [
     { "start": 1, "end": 10, "x": 169.63, "y": 401.2, "choiceGap": 33.25, "rowGap": 26.22, "radius": 9 },
     { "start": 11, "end": 20, "x": 368.19, "y": 401.2, "choiceGap": 33.25, "rowGap": 26.22, "radius": 9 },

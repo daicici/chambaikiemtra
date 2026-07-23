@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 
 from ...config import NORMALIZED_HEIGHT, NORMALIZED_WIDTH
+from ..templates.template_loader import load_template
 
 
 def correct_perspective(image: np.ndarray, quad: np.ndarray) -> np.ndarray:
@@ -19,3 +20,18 @@ def correct_perspective(image: np.ndarray, quad: np.ndarray) -> np.ndarray:
     )
     matrix = cv2.getPerspectiveTransform(quad, destination)
     return cv2.warpPerspective(image, matrix, (target_width, target_height))
+
+
+def correct_perspective_from_markers(image: np.ndarray, marker_quad: np.ndarray) -> np.ndarray:
+    markers = load_template()["markers"]
+    destination = np.array(
+        [
+            [markers["topLeft"]["x"], markers["topLeft"]["y"]],
+            [markers["topRight"]["x"], markers["topRight"]["y"]],
+            [markers["bottomRight"]["x"], markers["bottomRight"]["y"]],
+            [markers["bottomLeft"]["x"], markers["bottomLeft"]["y"]],
+        ],
+        dtype="float32",
+    )
+    matrix = cv2.getPerspectiveTransform(marker_quad, destination)
+    return cv2.warpPerspective(image, matrix, (NORMALIZED_WIDTH, NORMALIZED_HEIGHT))

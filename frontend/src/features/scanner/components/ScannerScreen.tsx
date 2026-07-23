@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { CameraControls } from "@/features/camera/components/CameraControls";
 import { CameraPreview } from "@/features/camera/components/CameraPreview";
 import { useCamera } from "@/features/camera/hooks/useCamera";
@@ -13,7 +13,13 @@ export function ScannerScreen() {
   const camera = useCamera();
   const scanner = useScanner(camera.videoRef);
   const didAutoOpenCamera = useRef(false);
-  const statusMessage = scanner.phase === "idle" ? camera.message : scanner.message;
+  const statusMessage = camera.stream ? scanner.message : camera.message;
+
+  const handleStart = useCallback(async () => {
+    const cameraReady = camera.stream ? true : await camera.start();
+    if (!cameraReady) return;
+    scanner.startAutoScan();
+  }, [camera.start, camera.stream, scanner]);
 
   useEffect(() => {
     if (didAutoOpenCamera.current) return;
@@ -33,9 +39,9 @@ export function ScannerScreen() {
         </Link>
       </div>
       <div className="scanner-grid">
-        <CameraPreview videoRef={camera.videoRef} />
+        <CameraPreview videoRef={camera.videoRef} flashKey={scanner.flashKey} frozenFrameUrl={scanner.frozenFrameUrl} />
         <div className="status-list">
-          <CameraControls hasCamera={Boolean(camera.stream)} isBusy={scanner.phase === "grading"} onOpen={camera.start} onCapture={scanner.scan} />
+          <CameraControls isRunning={scanner.isRunning} isBusy={scanner.phase === "grading"} onStart={handleStart} onStop={scanner.stopAutoScan} />
           <ScannerMessage message={statusMessage} />
           <CurrentResult result={scanner.currentResult} />
         </div>

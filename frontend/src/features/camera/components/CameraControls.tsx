@@ -1,18 +1,15 @@
 type Props = {
-  hasCamera: boolean;
+  isRunning: boolean;
   isBusy: boolean;
-  onOpen: () => void;
-  onCapture: () => void;
+  onStart: () => void;
+  onStop: () => void;
 };
 
-export function CameraControls({ hasCamera, isBusy, onOpen, onCapture }: Props) {
+export function CameraControls({ isRunning, isBusy, onStart, onStop }: Props) {
   return (
     <div className="action-row">
-      <button className="secondary-button" type="button" onClick={onOpen}>
-        Mở camera
-      </button>
-      <button className="primary-button" type="button" disabled={!hasCamera || isBusy} onClick={onCapture}>
-        {isBusy ? "Đang chấm..." : "Chụp và chấm"}
+      <button className="primary-button" type="button" disabled={isBusy && !isRunning} onClick={isRunning ? onStop : onStart}>
+        {isRunning ? "Dừng" : "Bắt đầu"}
       </button>
     </div>
   );

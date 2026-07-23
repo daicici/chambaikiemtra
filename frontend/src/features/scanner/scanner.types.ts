@@ -1,1 +1,1 @@
-export type ScannerPhase = "idle" | "ready" | "grading" | "done" | "error";
+export type ScannerPhase = "idle" | "ready" | "detecting" | "grading" | "saved" | "waiting-removal" | "done" | "error";

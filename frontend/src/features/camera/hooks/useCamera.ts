@@ -29,15 +29,15 @@ export function useCamera() {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [message, setMessage] = useState("Camera chưa mở.");
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (): Promise<boolean> => {
     if (stream) {
       await attachStream(videoRef.current, stream);
       setMessage("Camera đã sẵn sàng.");
-      return;
+      return true;
     }
     if (!navigator.mediaDevices?.getUserMedia) {
       setMessage("Trình duyệt này không hỗ trợ mở camera trực tiếp.");
-      return;
+      return false;
     }
 
     try {
@@ -45,8 +45,10 @@ export function useCamera() {
       setStream(nextStream);
       await attachStream(videoRef.current, nextStream);
       setMessage("Camera đã sẵn sàng.");
+      return true;
     } catch (error) {
       setMessage(getCameraErrorMessage(error));
+      return false;
     }
   }, [stream]);
 

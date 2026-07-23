@@ -3,6 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { openEnvironmentCamera } from "../services/camera.service";
 
+async function attachStream(video: HTMLVideoElement | null, stream: MediaStream) {
+  if (!video) return;
+  video.srcObject = stream;
+  video.muted = true;
+  video.playsInline = true;
+  await video.play().catch(() => undefined);
+}
+
 export function useCamera() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -12,7 +20,7 @@ export function useCamera() {
     try {
       const nextStream = await openEnvironmentCamera();
       setStream(nextStream);
-      if (videoRef.current) videoRef.current.srcObject = nextStream;
+      await attachStream(videoRef.current, nextStream);
       setMessage("Camera đã sẵn sàng.");
     } catch {
       setMessage("Không mở được camera. Vui lòng cấp quyền camera.");
@@ -25,7 +33,7 @@ export function useCamera() {
   }
 
   useEffect(() => {
-    if (videoRef.current && stream) videoRef.current.srcObject = stream;
+    if (stream) void attachStream(videoRef.current, stream);
     return () => stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream]);

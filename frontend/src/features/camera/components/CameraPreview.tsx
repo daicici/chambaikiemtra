@@ -8,7 +8,15 @@ type Props = {
 export function CameraPreview({ videoRef }: Props) {
   return (
     <div className="camera-box">
-      <video ref={videoRef} autoPlay playsInline muted />
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        onLoadedMetadata={(event) => {
+          void event.currentTarget.play().catch(() => undefined);
+        }}
+      />
       <CameraOverlay />
     </div>
   );

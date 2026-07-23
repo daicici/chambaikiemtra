@@ -9,3 +9,16 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+  - type: web
+    name: chambaikiemtra-omr
+    runtime: python
+    plan: free
+    rootDir: omr_service
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: ALLOWED_ORIGINS
+        value: "*"

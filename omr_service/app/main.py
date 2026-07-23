@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime
+import os
 from pathlib import Path
 from uuid import uuid4
 
 import cv2
 import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from .alignment import align_to_reference, auto_rotate, load_reference_image
@@ -23,6 +25,14 @@ from .storage import ensure_storage, list_scan_results, load_answer_key, save_an
 
 
 app = FastAPI(title="Cham Bai Kiem Tra OMR Service", version="0.1.0")
+allowed_origins = [origin.strip() for origin in os.getenv("ALLOWED_ORIGINS", "*").split(",") if origin.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.on_event("startup")

@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse
 
 from .alignment import align_to_reference, auto_rotate, load_reference_image
 from .annotation import annotate_sheet
-from .config import load_sheet_config, storage_path, target_size
+from .config import load_sheet_config, target_size
 from .excel import export_results_to_excel
 from .grading import grade_recognitions
 from .image_quality import assess_image_quality
@@ -21,7 +21,7 @@ from .ocr import recognize_fields_stub
 from .omr import recognize_answers
 from .paper_detection import warp_paper
 from .schemas import AnswerKeyIn, ScanResult
-from .storage import ensure_storage, list_scan_results, load_answer_key, save_answer_key, save_scan_result
+from .storage import ensure_storage, list_scan_results, load_answer_key, save_answer_key, save_scan_result, storage_path
 
 
 app = FastAPI(title="Cham Bai Kiem Tra OMR Service", version="0.1.0")

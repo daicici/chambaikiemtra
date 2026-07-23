@@ -1,7 +1,0 @@
-node_modules/
-dist/
-.env
-.DS_Store
-*.log
-omr_service/.venv/
-omr_service/storage/

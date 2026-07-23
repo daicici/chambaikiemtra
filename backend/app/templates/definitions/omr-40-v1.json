@@ -6,10 +6,10 @@
   "questions": 40,
   "choices": ["A", "B", "C", "D"],
   "groups": [
-    { "start": 1, "end": 10, "x": 126, "y": 210, "choiceGap": 38, "rowGap": 22, "radius": 8 },
-    { "start": 11, "end": 20, "x": 350, "y": 210, "choiceGap": 38, "rowGap": 22, "radius": 8 },
-    { "start": 21, "end": 30, "x": 575, "y": 210, "choiceGap": 38, "rowGap": 22, "radius": 8 },
-    { "start": 31, "end": 40, "x": 800, "y": 210, "choiceGap": 38, "rowGap": 22, "radius": 8 }
+    { "start": 1, "end": 10, "x": 169.63, "y": 401.2, "choiceGap": 33.25, "rowGap": 26.22, "radius": 9 },
+    { "start": 11, "end": 20, "x": 368.19, "y": 401.2, "choiceGap": 33.25, "rowGap": 26.22, "radius": 9 },
+    { "start": 21, "end": 30, "x": 567.33, "y": 401.2, "choiceGap": 33.25, "rowGap": 26.22, "radius": 9 },
+    { "start": 31, "end": 40, "x": 766.57, "y": 401.2, "choiceGap": 33.25, "rowGap": 26.22, "radius": 9 }
   ],
   "fields": {
     "name": { "x": 120, "y": 56, "w": 230, "h": 52 },

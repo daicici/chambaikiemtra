@@ -8,7 +8,7 @@ type Props = {
 export function ExamCodeTabs({ value, onChange }: Props) {
   const codes = ["101", "102", "103", "104"];
   return (
-    <div className="action-row">
+    <div className="action-row" aria-label="Chọn nhanh mã đề">
       {codes.map((code) => (
         <button className={value === code ? "primary-button" : "secondary-button"} key={code} type="button" onClick={() => onChange(code)}>
           Mã {code}

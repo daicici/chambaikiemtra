@@ -6,11 +6,25 @@ export function emptyAnswers(): AnswerChoice[] {
   return Array.from({ length: 40 }, () => "A" as AnswerChoice);
 }
 
+const DEFAULT_ANSWER_KEY: AnswerKey = {
+  subject: "Toán",
+  exam_code: "101",
+  answers: emptyAnswers(),
+  max_score: 10
+};
+
 export function loadAnswerKey(): AnswerKey {
-  if (typeof window === "undefined") return { subject: "Toán", exam_code: "000", answers: emptyAnswers(), max_score: 10 };
+  if (typeof window === "undefined") return DEFAULT_ANSWER_KEY;
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return { subject: "Toán", exam_code: "000", answers: emptyAnswers(), max_score: 10 };
-  return JSON.parse(raw) as AnswerKey;
+  if (!raw) return DEFAULT_ANSWER_KEY;
+
+  const parsed = JSON.parse(raw) as Partial<AnswerKey>;
+  return {
+    subject: parsed.subject || DEFAULT_ANSWER_KEY.subject,
+    exam_code: parsed.exam_code || DEFAULT_ANSWER_KEY.exam_code,
+    answers: parsed.answers?.length === 40 ? (parsed.answers as AnswerChoice[]) : emptyAnswers(),
+    max_score: parsed.max_score || DEFAULT_ANSWER_KEY.max_score
+  };
 }
 
 export function saveAnswerKey(answerKey: AnswerKey) {

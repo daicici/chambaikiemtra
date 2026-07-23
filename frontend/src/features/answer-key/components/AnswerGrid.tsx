@@ -3,6 +3,12 @@
 import type { AnswerChoice } from "@/types/answer";
 
 const CHOICES: AnswerChoice[] = ["A", "B", "C", "D"];
+const GROUPS = [
+  { start: 1, end: 10 },
+  { start: 11, end: 20 },
+  { start: 21, end: 30 },
+  { start: 31, end: 40 }
+];
 
 type Props = {
   answers: AnswerChoice[];
@@ -11,27 +17,31 @@ type Props = {
 
 export function AnswerGrid({ answers, onChange }: Props) {
   return (
-    <div className="answer-grid">
-      {[0, 1, 2, 3].map((group) => (
-        <div className="answer-group" key={group}>
-          <div className="answer-header">
+    <div className="answer-sheet-grid">
+      {GROUPS.map((group) => (
+        <section className="answer-sheet-group" key={group.start}>
+          <span className="sheet-mini-marker" aria-hidden="true" />
+          <div className="answer-choice-header" aria-hidden="true">
             <span />
             {CHOICES.map((choice) => (
-              <span key={choice}>{choice}</span>
+              <span className="choice-label" key={choice}>
+                {choice}
+              </span>
             ))}
           </div>
-          {Array.from({ length: 10 }, (_, row) => {
-            const questionIndex = group * 10 + row;
+          {Array.from({ length: group.end - group.start + 1 }, (_, row) => {
+            const questionNumber = group.start + row;
+            const questionIndex = questionNumber - 1;
             return (
-              <div className="answer-row" key={questionIndex}>
-                <span className="answer-number">{questionIndex + 1}</span>
+              <div className={`answer-sheet-row${row === 5 ? " section-break" : ""}`} key={questionNumber}>
+                <span className="answer-number">{questionNumber}</span>
                 {CHOICES.map((choice) => (
                   <button
+                    aria-label={`Câu ${questionNumber} chọn ${choice}`}
                     className={`bubble-button ${answers[questionIndex] === choice ? "active" : ""}`}
                     key={choice}
-                    type="button"
                     onClick={() => onChange(questionIndex, choice)}
-                    aria-label={`Câu ${questionIndex + 1} chọn ${choice}`}
+                    type="button"
                   >
                     {choice}
                   </button>
@@ -39,7 +49,7 @@ export function AnswerGrid({ answers, onChange }: Props) {
               </div>
             );
           })}
-        </div>
+        </section>
       ))}
     </div>
   );

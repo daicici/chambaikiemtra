@@ -30,14 +30,17 @@ async def grade_uploaded_sheet(file: UploadFile, answer_key: AnswerKeyPayload) -
     aligned_sheet = detect_and_align_sheet(image)
     fingerprint = create_fingerprint(aligned_sheet)
     duplicate = is_duplicate(fingerprint)
+    student = recognize_student_information(aligned_sheet, answer_key)
+    if student.exam_code != answer_key.exam_code:
+        messages.append(f"Mã đề nhận diện là {student.exam_code}, khác mã đề đáp án đang dùng là {answer_key.exam_code}.")
+
     recognized = recognize_40_answers(aligned_sheet)
     compared = attach_correct_answers(recognized, answer_key)
     summary = summarize_score(compared, answer_key.max_score)
-    student = recognize_student_information(aligned_sheet, answer_key)
     annotated_image = build_annotated_image(aligned_sheet, compared)
 
     status = "duplicate" if duplicate else "ok"
-    if quality.warnings or summary["review_count"] > 0:
+    if quality.warnings or summary["review_count"] > 0 or messages:
         status = "needs_review"
 
     cleanup_after_scan()

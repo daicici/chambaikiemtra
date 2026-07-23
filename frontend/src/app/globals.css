@@ -173,6 +173,10 @@ select {
   gap: 12px;
 }
 
+.form-grid.compact {
+  grid-template-columns: 1fr;
+}
+
 .field {
   display: grid;
   gap: 6px;
@@ -189,35 +193,103 @@ select {
   color: var(--text);
 }
 
-.answer-grid {
+.answer-key-layout {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
 }
 
-.answer-group {
+.answer-key-sidebar {
+  display: grid;
+  gap: 14px;
+}
+
+.answer-sheet-panel {
+  overflow-x: auto;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 12px;
+  background: #fffefb;
+  padding: 16px;
 }
 
-.answer-header,
-.answer-row {
-  display: grid;
-  grid-template-columns: 34px repeat(4, minmax(34px, 1fr));
+.sheet-title-row {
+  display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 9px;
+  margin-bottom: 12px;
+  font-size: 20px;
 }
 
-.answer-header {
-  color: var(--primary);
+.sheet-main-marker,
+.sheet-mini-marker {
+  display: inline-block;
+  background: #111111;
+}
+
+.sheet-main-marker {
+  width: 14px;
+  height: 14px;
+}
+
+.answer-sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
+  gap: 18px;
+  min-width: 720px;
+}
+
+.answer-sheet-group {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  padding: 8px 10px 10px;
+  background: #ffffff;
+}
+
+.sheet-mini-marker {
+  position: absolute;
+  top: -10px;
+  left: -24px;
+  width: 13px;
+  height: 13px;
+}
+
+.answer-choice-header,
+.answer-sheet-row {
+  display: grid;
+  grid-template-columns: 30px repeat(4, minmax(24px, 1fr));
+  align-items: center;
+  gap: 8px;
+}
+
+.answer-choice-header {
+  color: #111111;
   font-size: 12px;
   font-weight: 900;
   text-align: center;
+  margin-bottom: 4px;
 }
 
-.answer-row {
-  min-height: 34px;
+.choice-label {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: 0 auto;
+  border: 1px solid #111111;
+  border-radius: 999px;
+}
+
+.answer-sheet-row {
+  min-height: 30px;
+}
+
+.answer-sheet-row.section-break {
+  border-top: 1px solid #111111;
+  margin-top: 3px;
+  padding-top: 3px;
 }
 
 .answer-number {
@@ -228,10 +300,10 @@ select {
 .bubble-button {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   margin: 0 auto;
-  border: 1px solid #a7b7ae;
+  border: 1px solid #444444;
   border-radius: 999px;
   background: #ffffff;
   color: transparent;
@@ -241,6 +313,67 @@ select {
 .bubble-button.active {
   border-color: var(--primary);
   background: radial-gradient(circle at center, var(--primary) 0 45%, #ffffff 48%);
+}
+
+.exam-code-preview {
+  width: min(100%, 190px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.exam-code-title {
+  margin-bottom: 8px;
+  color: #111111;
+  font-weight: 800;
+}
+
+.exam-code-boxes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-bottom: 8px;
+}
+
+.exam-code-boxes span {
+  display: grid;
+  place-items: center;
+  height: 30px;
+  border: 1px solid #111111;
+  font-weight: 900;
+}
+
+.exam-code-digit-grid {
+  display: grid;
+  gap: 4px;
+}
+
+.exam-code-digit-row {
+  display: grid;
+  grid-template-columns: 20px repeat(3, 24px);
+  gap: 7px;
+  align-items: center;
+}
+
+.exam-code-digit-row span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.code-bubble {
+  width: 20px;
+  height: 20px;
+  border: 1px solid #444444;
+  border-radius: 999px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.code-bubble.active {
+  background: radial-gradient(circle at center, var(--primary) 0 45%, #ffffff 48%);
+  border-color: var(--primary);
 }
 
 .scanner-grid {
@@ -392,16 +525,24 @@ th {
   }
 
   .form-grid,
-  .answer-grid,
+  .answer-key-layout,
   .scanner-grid {
     grid-template-columns: 1fr;
   }
 
-  .camera-box {
-    aspect-ratio: 3 / 4;
+  .answer-key-sidebar {
+    grid-template-columns: 1fr;
   }
 
-  .answer-group {
-    overflow-x: auto;
+  .answer-sheet-panel {
+    padding: 12px;
+  }
+
+  .answer-sheet-grid {
+    min-width: 680px;
+  }
+
+  .camera-box {
+    aspect-ratio: 3 / 4;
   }
 }

@@ -1,26 +1,40 @@
 {
   "id": "omr-40-v1",
   "name": "Phiếu trả lời trắc nghiệm 40 câu",
+  "sourcePdf": "templates/source/40_cau.pdf",
   "normalizedWidth": 1000,
   "normalizedHeight": 707,
   "questions": 40,
   "choices": ["A", "B", "C", "D"],
   "markers": {
-    "topLeft": { "x": 59.0, "y": 57.8 },
-    "topRight": { "x": 941.9, "y": 57.8 },
-    "bottomRight": { "x": 941.9, "y": 657.8 },
-    "bottomLeft": { "x": 59.0, "y": 657.8 }
+    "topLeft": { "x": 59.01, "y": 57.77 },
+    "topRight": { "x": 941.88, "y": 57.77 },
+    "bottomRight": { "x": 941.88, "y": 657.76 },
+    "bottomLeft": { "x": 59.01, "y": 657.76 }
   },
   "groups": [
-    { "start": 1, "end": 10, "x": 169.63, "y": 401.2, "choiceGap": 33.25, "rowGap": 26.22, "radius": 9 },
-    { "start": 11, "end": 20, "x": 368.19, "y": 401.2, "choiceGap": 33.25, "rowGap": 26.22, "radius": 9 },
-    { "start": 21, "end": 30, "x": 567.33, "y": 401.2, "choiceGap": 33.25, "rowGap": 26.22, "radius": 9 },
-    { "start": 31, "end": 40, "x": 766.57, "y": 401.2, "choiceGap": 33.25, "rowGap": 26.22, "radius": 9 }
+    { "start": 1, "end": 10, "x": 169.63, "y": 401.2, "choiceGap": 33.36, "rowGap": 26.28, "radius": 9 },
+    { "start": 11, "end": 20, "x": 368.24, "y": 401.2, "choiceGap": 33.36, "rowGap": 26.28, "radius": 9 },
+    { "start": 21, "end": 30, "x": 567.39, "y": 401.2, "choiceGap": 33.36, "rowGap": 26.28, "radius": 9 },
+    { "start": 31, "end": 40, "x": 766.55, "y": 401.2, "choiceGap": 33.36, "rowGap": 26.28, "radius": 9 }
   ],
+  "examCodeGrid": {
+    "digits": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+    "columns": [
+      { "index": 0, "x": 863.41 },
+      { "index": 1, "x": 881.18 },
+      { "index": 2, "x": 898.82 }
+    ],
+    "y": 101.07,
+    "rowGap": 25.82,
+    "radius": 8,
+    "minFillScore": 0.12,
+    "minGap": 0.04
+  },
   "fields": {
-    "name": { "x": 120, "y": 56, "w": 230, "h": 52 },
-    "subject": { "x": 422, "y": 56, "w": 150, "h": 52 },
-    "className": { "x": 635, "y": 56, "w": 120, "h": 52 },
-    "examCode": { "x": 835, "y": 150, "w": 90, "h": 54 }
+    "name": { "x": 590, "y": 220, "w": 292, "h": 34 },
+    "subject": { "x": 590, "y": 132, "w": 292, "h": 34 },
+    "className": { "x": 590, "y": 177, "w": 292, "h": 34 },
+    "examCode": { "x": 850, "y": 90, "w": 58, "h": 270 }
   }
 }

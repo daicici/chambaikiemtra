@@ -1,0 +1,20 @@
+{
+  "id": "omr-40-v1",
+  "name": "Phiếu trả lời trắc nghiệm 40 câu",
+  "normalizedWidth": 1000,
+  "normalizedHeight": 707,
+  "questions": 40,
+  "choices": ["A", "B", "C", "D"],
+  "groups": [
+    { "start": 1, "end": 10, "x": 126, "y": 210, "choiceGap": 38, "rowGap": 22, "radius": 8 },
+    { "start": 11, "end": 20, "x": 350, "y": 210, "choiceGap": 38, "rowGap": 22, "radius": 8 },
+    { "start": 21, "end": 30, "x": 575, "y": 210, "choiceGap": 38, "rowGap": 22, "radius": 8 },
+    { "start": 31, "end": 40, "x": 800, "y": 210, "choiceGap": 38, "rowGap": 22, "radius": 8 }
+  ],
+  "fields": {
+    "name": { "x": 120, "y": 56, "w": 230, "h": 52 },
+    "subject": { "x": 422, "y": 56, "w": 150, "h": 52 },
+    "className": { "x": 635, "y": 56, "w": 120, "h": 52 },
+    "examCode": { "x": 835, "y": 150, "w": 90, "h": 54 }
+  }
+}

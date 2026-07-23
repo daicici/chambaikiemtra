@@ -1,0 +1,12 @@
+{
+  "scan_id": "string",
+  "fingerprint": "string",
+  "student": {
+    "name": "string",
+    "class_name": "string",
+    "exam_code": "string"
+  },
+  "answers": [],
+  "score": 0,
+  "status": "ok|needs_review|rejected"
+}

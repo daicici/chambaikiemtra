@@ -1,0 +1,12 @@
+node_modules/
+.next/
+dist/
+build/
+.env
+.env.local
+.venv/
+__pycache__/
+*.pyc
+*.log
+.DS_Store
+backend/app/temporary/tmp/

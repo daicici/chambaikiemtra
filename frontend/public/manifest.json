@@ -1,0 +1,8 @@
+{
+  "name": "OMR Auto Grading",
+  "short_name": "OMR Grading",
+  "display": "standalone",
+  "start_url": "/",
+  "theme_color": "#0f766e",
+  "background_color": "#f6fbf8"
+}

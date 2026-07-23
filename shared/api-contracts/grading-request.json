@@ -1,0 +1,7 @@
+{
+  "multipart": true,
+  "fields": {
+    "image": "image/jpeg|image/png|image/webp",
+    "answer_key": "JSON object with 40 answers"
+  }
+}

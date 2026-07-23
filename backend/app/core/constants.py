@@ -1,0 +1,2 @@
+CHOICES = ["A", "B", "C", "D"]
+QUESTION_COUNT = 40

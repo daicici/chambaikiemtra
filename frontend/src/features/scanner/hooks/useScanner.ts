@@ -12,10 +12,9 @@ import type { ScannerPhase } from "../scanner.types";
 const SCAN_RETRY_MS = 1200;
 const AFTER_SUCCESS_FREEZE_MS = 900;
 const REMOVAL_POLL_MS = 350;
-const REMOVAL_SETTLE_MS = 900;
 const REMOVAL_DIFF_THRESHOLD = 16;
 const REMOVAL_DIFF_FRAMES = 2;
-const FIRST_SCAN_DELAY_MS = 650;
+const FIRST_SCAN_DELAY_SECONDS = 5;
 
 function sleep(ms: number) {
   return new Promise<void>((resolve) => window.setTimeout(resolve, ms));
@@ -50,6 +49,14 @@ function signatureDistance(first: number[], second: number[]) {
 
 function withoutAnnotatedImage(result: GradingResult): GradingResult {
   return { ...result, annotated_image: null };
+}
+
+async function waitBeforeFirstScan(setMessage: (message: string) => void, shouldContinue: () => boolean) {
+  for (let second = FIRST_SCAN_DELAY_SECONDS; second > 0; second -= 1) {
+    if (!shouldContinue()) return;
+    setMessage(`Sẽ bắt đầu chụp bài thứ nhất sau ${second} giây. Giữ phiếu nằm trọn trong khung hình.`);
+    await sleep(1000);
+  }
 }
 
 export function useScanner(videoRef: RefObject<HTMLVideoElement | null>) {
@@ -93,8 +100,7 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>) {
         }
 
         if (changedFrames >= REMOVAL_DIFF_FRAMES) {
-          setMessage("Đã phát hiện nhấc phiếu. Đang chờ camera ổn định để quét phiếu tiếp theo...");
-          await sleep(REMOVAL_SETTLE_MS);
+          setMessage("Đã phát hiện nhấc phiếu. Đang quét phiếu tiếp theo...");
           return;
         }
       }
@@ -103,7 +109,7 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>) {
   );
 
   const runAutoScan = useCallback(async () => {
-    await sleep(FIRST_SCAN_DELAY_MS);
+    await waitBeforeFirstScan(setMessage, () => runningRef.current);
     while (runningRef.current) {
       const video = videoRef.current;
       if (!isVideoReady(video)) {
@@ -120,6 +126,8 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>) {
         setMessage("Đang quét phiếu trong khung hình...");
         const blob = await captureFrame(video);
         previewUrl = URL.createObjectURL(blob);
+        setFrozenFrameUrl(previewUrl);
+        previewUrl = null;
         setPhase("grading");
         setMessage("Đã nhận ảnh. Đang chấm điểm và lưu kết quả...");
         const answerKey = loadAnswerKey();
@@ -132,11 +140,6 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>) {
 
         if (result.annotated_image) {
           setFrozenFrameUrl(result.annotated_image);
-          URL.revokeObjectURL(previewUrl);
-          previewUrl = null;
-        } else {
-          setFrozenFrameUrl(previewUrl);
-          previewUrl = null;
         }
         setFlashKey((key) => key + 1);
 

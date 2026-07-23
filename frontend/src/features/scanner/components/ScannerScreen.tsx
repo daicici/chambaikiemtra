@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { CameraControls } from "@/features/camera/components/CameraControls";
 import { CameraPreview } from "@/features/camera/components/CameraPreview";
 import { useCamera } from "@/features/camera/hooks/useCamera";
@@ -10,7 +11,15 @@ import { ScannerMessage } from "./ScannerMessage";
 
 export function ScannerScreen() {
   const camera = useCamera();
-  const scanner = useScanner(camera.videoRef.current);
+  const scanner = useScanner(camera.videoRef);
+  const didAutoOpenCamera = useRef(false);
+  const statusMessage = scanner.phase === "idle" ? camera.message : scanner.message;
+
+  useEffect(() => {
+    if (didAutoOpenCamera.current) return;
+    didAutoOpenCamera.current = true;
+    void camera.start();
+  }, [camera.start]);
 
   return (
     <section className="panel">
@@ -27,7 +36,7 @@ export function ScannerScreen() {
         <CameraPreview videoRef={camera.videoRef} />
         <div className="status-list">
           <CameraControls hasCamera={Boolean(camera.stream)} isBusy={scanner.phase === "grading"} onOpen={camera.start} onCapture={scanner.scan} />
-          <ScannerMessage message={scanner.message || camera.message} />
+          <ScannerMessage message={statusMessage} />
           <CurrentResult result={scanner.currentResult} />
         </div>
       </div>

@@ -2,9 +2,9 @@ import type { AnswerKey } from "@/types/answer";
 import type { GradingResult } from "@/types/grading-result";
 import { API_BASE_URL } from "./api-client";
 
-export async function scanSheet(image: Blob, answerKey: AnswerKey): Promise<GradingResult> {
+export async function scanSheet(image: Blob, answerKey: AnswerKey, fileName = "sheet.jpg"): Promise<GradingResult> {
   const formData = new FormData();
-  formData.append("image", image, "sheet.jpg");
+  formData.append("image", image, fileName);
   formData.append("answer_key", JSON.stringify(answerKey));
 
   const response = await fetch(`${API_BASE_URL}/api/v1/grading/scan`, {

@@ -190,6 +190,34 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>) {
     setMessage("Đã dừng quét tự động.");
   }, [setFrozenFrameUrl]);
 
+  const scanUploadedFile = useCallback(
+    async (file: File) => {
+      runningRef.current = false;
+      setIsRunning(false);
+      const previewUrl = URL.createObjectURL(file);
+      setFrozenFrameUrl(previewUrl);
+      setFlashKey((key) => key + 1);
+      setPhase("grading");
+      setMessage(`Đã nhận file ${file.name}. Đang chấm điểm và lưu kết quả...`);
+
+      try {
+        const answerKey = loadAnswerKey();
+        const result = await scanSheet(file, answerKey, file.name || "sheet.jpg");
+        if (result.annotated_image) {
+          setFrozenFrameUrl(result.annotated_image);
+        }
+        saveResult(result);
+        setPhase("done");
+        setMessage(`Đã chấm xong file tải lên: ${result.score}/${result.max_score} điểm. Kết quả đã được đưa vào danh sách xuất Excel.`);
+      } catch (error) {
+        setFrozenFrameUrl(null);
+        setPhase("error");
+        setMessage(error instanceof Error ? error.message : "Không chấm được file tải lên.");
+      }
+    },
+    [saveResult, setFrozenFrameUrl]
+  );
+
   async function scan() {
     const video = videoRef.current;
     if (!video) {
@@ -226,5 +254,5 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>) {
     };
   }, []);
 
-  return { phase, message, currentResult, flashKey, frozenFrameUrl, isRunning, scan, startAutoScan, stopAutoScan };
+  return { phase, message, currentResult, flashKey, frozenFrameUrl, isRunning, scan, scanUploadedFile, startAutoScan, stopAutoScan };
 }

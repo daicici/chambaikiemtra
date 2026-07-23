@@ -194,7 +194,8 @@ export function useScanner(videoRef: RefObject<HTMLVideoElement | null>) {
     async (file: File) => {
       runningRef.current = false;
       setIsRunning(false);
-      const previewUrl = URL.createObjectURL(file);
+      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      const previewUrl = isPdf ? null : URL.createObjectURL(file);
       setFrozenFrameUrl(previewUrl);
       setFlashKey((key) => key + 1);
       setPhase("grading");

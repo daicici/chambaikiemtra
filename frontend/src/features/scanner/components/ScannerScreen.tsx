@@ -40,7 +40,7 @@ export function ScannerScreen() {
       <div className="section-heading">
         <div>
           <h1>Quét phiếu trả lời</h1>
-          <p>Ảnh cần nhìn thấy đầy đủ tờ giấy. Backend sẽ kiểm tra chất lượng trước khi chấm.</p>
+          <p>Camera, ảnh hoặc PDF cần nhìn thấy đầy đủ tờ giấy. Backend sẽ kiểm tra chất lượng trước khi chấm.</p>
         </div>
         <Link className="secondary-button" href="/results">
           Xem kết quả

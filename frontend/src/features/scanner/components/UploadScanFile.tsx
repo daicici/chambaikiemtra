@@ -8,7 +8,7 @@ type Props = {
   onChange: (file: File | null) => void;
 };
 
-const ACCEPTED_TYPES = "image/jpeg,image/png,image/webp";
+const ACCEPTED_TYPES = "image/jpeg,image/png,image/webp,application/pdf,.pdf";
 
 export function UploadScanFile({ disabled, file, onChange }: Props) {
   function handleChange(event: ChangeEvent<HTMLInputElement>) {
@@ -18,10 +18,10 @@ export function UploadScanFile({ disabled, file, onChange }: Props) {
   return (
     <div className="upload-scan-card">
       <label className="field">
-        Tải lên ảnh bài làm
+        Tải lên file bài làm
         <input accept={ACCEPTED_TYPES} disabled={disabled} onChange={handleChange} type="file" />
       </label>
-      <p>Hỗ trợ JPG, PNG hoặc WEBP. Nếu đã chọn file, nút Bắt đầu sẽ chấm file này thay vì quét camera.</p>
+      <p>Hỗ trợ PDF, JPG, PNG hoặc WEBP. Nếu đã chọn file, nút Bắt đầu sẽ chấm file này thay vì quét camera.</p>
       {file ? (
         <div className="selected-file-row">
           <span>{file.name}</span>
